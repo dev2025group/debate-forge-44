@@ -54,10 +54,20 @@ const AgentMessage = ({ message, agentColor, agentName, agentRole }: AgentMessag
     if (title.includes('Confidence')) return '📊';
     if (title.includes('Citation') || title.includes('Reference')) return '📚';
     if (title.includes('Uncertainty')) return '🤔';
+    if (title.includes('Evidence') || title.includes('Quote')) return '📖';
     return '📄';
   };
   
-  const formatContent = (content: string) => {
+  const isEvidenceSection = (title: string) => {
+    return title.includes('Evidence') || 
+           title.includes('Quote') || 
+           title.includes('Citation') ||
+           title === 'Direct Evidence' ||
+           title === 'Supporting Evidence' ||
+           title === 'Evidence Quotes';
+  };
+  
+  const formatContent = (content: string, isEvidence: boolean = false) => {
     return content
       .split('\n')
       .map(line => {
@@ -65,7 +75,30 @@ const AgentMessage = ({ message, agentColor, agentName, agentRole }: AgentMessag
         
         // Handle bullet points
         if (trimmed.startsWith('-') || trimmed.startsWith('*') || trimmed.startsWith('•')) {
-          return `<li class="ml-4 mb-2 leading-relaxed">${trimmed.substring(1).trim()}</li>`;
+          const bulletContent = trimmed.substring(1).trim();
+          
+          // Special formatting for evidence/quotes
+          if (isEvidence) {
+            // Try to extract quote (text in "quotes")
+            const quoteMatch = bulletContent.match(/"([^"]+)"/);
+            if (quoteMatch) {
+              const beforeQuote = bulletContent.substring(0, bulletContent.indexOf('"'));
+              const quote = quoteMatch[1];
+              const afterQuote = bulletContent.substring(bulletContent.indexOf('"') + quote.length + 2);
+              
+              return `
+                <li class="ml-4 mb-3 leading-relaxed">
+                  <span class="text-foreground/90">${beforeQuote}</span>
+                  <span class="inline-block bg-primary/10 border-l-2 border-primary px-2 py-1 my-1 italic text-primary font-medium">
+                    "${quote}"
+                  </span>
+                  <span class="text-muted-foreground text-sm">${afterQuote}</span>
+                </li>
+              `;
+            }
+          }
+          
+          return `<li class="ml-4 mb-2 leading-relaxed">${bulletContent}</li>`;
         }
         
         // Handle numbered lists
@@ -150,21 +183,37 @@ const AgentMessage = ({ message, agentColor, agentName, agentRole }: AgentMessag
               {/* Other Sections */}
               {Object.entries(message.sections)
                 .filter(([title]) => title !== "Reasoning")
-                .map(([title, content]) => (
-                  <div 
-                    key={title}
-                    className="bg-muted/30 rounded-lg p-4 border border-border/50"
-                  >
-                    <h4 className="font-semibold text-sm mb-3 flex items-center gap-2 text-foreground">
-                      <span>{getSectionIcon(title)}</span>
-                      <span>{title}</span>
-                    </h4>
+                .map(([title, content]) => {
+                  const isEvidence = isEvidenceSection(title);
+                  return (
                     <div 
-                      className="prose prose-sm max-w-none text-foreground/90 leading-relaxed [&_li]:text-foreground/90 [&_p]:text-foreground/90"
-                      dangerouslySetInnerHTML={{ __html: formatContent(content) }}
-                    />
-                  </div>
-                ))}
+                      key={title}
+                      className={cn(
+                        "rounded-lg p-4 border",
+                        isEvidence 
+                          ? "bg-accent/20 border-accent/30" 
+                          : "bg-muted/30 border-border/50"
+                      )}
+                    >
+                      <h4 className={cn(
+                        "font-semibold text-sm mb-3 flex items-center gap-2",
+                        isEvidence ? "text-accent-foreground" : "text-foreground"
+                      )}>
+                        <span>{getSectionIcon(title)}</span>
+                        <span>{title}</span>
+                        {isEvidence && (
+                          <span className="text-xs font-normal text-muted-foreground ml-auto">
+                            Direct quotes from papers
+                          </span>
+                        )}
+                      </h4>
+                      <div 
+                        className="prose prose-sm max-w-none text-foreground/90 leading-relaxed [&_li]:text-foreground/90 [&_p]:text-foreground/90"
+                        dangerouslySetInnerHTML={{ __html: formatContent(content, isEvidence) }}
+                      />
+                    </div>
+                  );
+                })}
             </div>
           ) : (
             <div className="prose prose-sm max-w-none">

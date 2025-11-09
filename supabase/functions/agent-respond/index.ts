@@ -24,6 +24,10 @@ CRITICAL: You MUST format your response using EXACTLY this structure with ## hea
 - Finding 1 with Paper X reference
 - Finding 2 with Paper Y reference
 
+## Evidence Quotes
+- Paper X: "exact quote from abstract/findings" - supports [claim]
+- Paper Y: "exact quote from results/methodology" - demonstrates [point]
+
 ## Methodologies Observed
 - Brief methodology comparison
 
@@ -38,6 +42,7 @@ RULES:
 - DO NOT use **bold text** for section headers
 - DO NOT write paragraphs - use bullets
 - The Reasoning section MUST show your step-by-step thinking process
+- ALWAYS include Evidence Quotes section with actual text from papers in "quotes"
 
 EXAMPLE:
 ## Reasoning
@@ -47,7 +52,11 @@ EXAMPLE:
 
 ## Key Patterns
 - All papers show ubiquitous microplastic presence (Papers 1, 2, 3)
-- Primary human exposure through oral intake`,
+- Primary human exposure through oral intake
+
+## Evidence Quotes
+- Paper 1: "microplastics detected in 100% of placental samples" - confirms ubiquitous presence
+- Paper 2: "oral intake represents primary exposure route" - supports exposure pathway`,
 
   Critic: `You are Dr. Critical, a rigorous critic.
 
@@ -124,6 +133,10 @@ CRITICAL: You MUST format your response using EXACTLY this structure with ## hea
 - Connection 1 between papers/agents
 - Connection 2 between papers/agents
 
+## Supporting Evidence
+- Paper X: "quote" - supports connection Y
+- Paper Z: "quote" - demonstrates link W
+
 ## Proposed Hypothesis
 - Hypothesis based on synthesis
 
@@ -138,6 +151,7 @@ RULES:
 - DO NOT use **bold text**
 - Focus on synthesis, not repetition
 - The Reasoning section MUST show how you synthesized conflicting views
+- ALWAYS include Supporting Evidence with actual quotes
 
 EXAMPLE:
 ## Reasoning
@@ -147,7 +161,11 @@ EXAMPLE:
 
 ## Points of Agreement
 - All papers confirm ubiquitous MP presence in environment and human body
-- Inflammation and oxidative stress are key mechanisms`,
+- Inflammation and oxidative stress are key mechanisms
+
+## Supporting Evidence
+- Paper 1: "microplastics detected in placenta, blood, lungs" - confirms multi-organ presence
+- Paper 3: "oxidative stress observed in all exposure models" - validates mechanism`,
 
   Validator: `You are Dr. Verify, an evidence-based validator.
 
@@ -162,6 +180,10 @@ CRITICAL: You MUST format your response using EXACTLY this structure with ## hea
 - ✓ Claim 1 (cite Paper X, page/section)
 - ✓ Claim 2 (cite Paper Y, page/section)
 
+## Direct Evidence
+- Paper X: "exact quote from paper" - verifies claim about [topic]
+- Paper Y: "exact quote from findings" - confirms [specific point]
+
 ## Confidence Assessment
 - Overall confidence: High/Medium/Low
 - Reasoning in 1 sentence
@@ -170,17 +192,14 @@ CRITICAL: You MUST format your response using EXACTLY this structure with ## hea
 - Uncertainty 1
 - Uncertainty 2
 
-## Key Citations
-- Paper X: "quote" supports claim Y
-- Paper Z: "quote" supports claim W
-
 RULES:
 - Start EVERY section with ## followed by exact section name
 - Use bullet points only
 - Max 3 items per section
-- Always cite specific papers
+- Always cite specific papers with actual quotes
 - DO NOT use **bold text**
 - The Reasoning section MUST show your verification methodology
+- ALWAYS include Direct Evidence section with verbatim quotes
 
 EXAMPLE:
 ## Reasoning
@@ -190,7 +209,11 @@ EXAMPLE:
 
 ## Verified Claims
 - ✓ MPs detected in human placenta (Paper 1, Key Findings)
-- ✓ Oral intake is primary exposure route (Paper 2, Abstract)`
+- ✓ Oral intake is primary exposure route (Paper 2, Abstract)
+
+## Direct Evidence
+- Paper 1: "microplastics detected in 100% of placental samples analyzed" - verifies presence claim
+- Paper 2: "oral ingestion accounts for 80% of human microplastic exposure" - confirms primary route`
 };
 
 serve(async (req) => {
