@@ -2,8 +2,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DebateViewer from "@/components/DebateViewer";
 import InsightReport from "@/components/InsightReport";
+import { PdfUploader } from "@/components/PdfUploader";
 import { runDebate, agentsList } from "@/debate/ConversationOrchestrator";
 import { researchPapers } from "@/data/researchPapers";
 import { PlayCircle, Users, FileText, Sparkles } from "lucide-react";
@@ -13,15 +15,24 @@ const Index = () => {
   const [conversation, setConversation] = useState<any[]>([]);
   const [debateResult, setDebateResult] = useState<any>(null);
   const [isDebating, setIsDebating] = useState(false);
+  const [uploadedPapers, setUploadedPapers] = useState<any[]>([]);
+  const [paperSource, setPaperSource] = useState<"sample" | "uploaded">("sample");
   
   const startDebate = async () => {
+    const papers = paperSource === "uploaded" ? uploadedPapers : researchPapers;
+    
+    if (papers.length === 0) {
+      toast.error("Please upload at least one research paper first.");
+      return;
+    }
+    
     setIsDebating(true);
     setConversation([]);
     setDebateResult(null);
     
     toast.info("Debate started! Agents are analyzing research papers...");
     
-    const result = await runDebate(researchPapers, (updatedConversation) => {
+    const result = await runDebate(papers, (updatedConversation) => {
       setConversation(updatedConversation);
     });
     
@@ -34,6 +45,13 @@ const Index = () => {
       toast.error("Debate encountered an error.");
     }
   };
+
+  const handlePapersExtracted = (papers: any[]) => {
+    setUploadedPapers(papers);
+    setPaperSource("uploaded");
+  };
+
+  const activePapers = paperSource === "uploaded" ? uploadedPapers : researchPapers;
   
   const synthesisMessage = conversation.find(m => m.agent === "Synthesizer");
   const validationMessage = conversation.find(m => m.agent === "Validator");
@@ -106,29 +124,64 @@ const Index = () => {
           </div>
         )}
         
-        {/* Research Papers Info */}
+        {/* Paper Source Tabs */}
         {conversation.length === 0 && !isDebating && (
-          <Card className="p-6 mb-8 bg-gradient-to-br from-primary/5 to-background">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                <FileText className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg mb-2">Research Topic: AI for Climate Modeling</h3>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Agents will analyze {researchPapers.length} research papers comparing laboratory studies, 
-                  real-world deployments, and hybrid approaches to AI-powered climate prediction systems.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {researchPapers.map(paper => (
-                    <Badge key={paper.id} variant="outline" className="text-xs">
-                      Paper {paper.id}: {paper.year}
-                    </Badge>
-                  ))}
+          <Tabs value={paperSource} onValueChange={(v) => setPaperSource(v as "sample" | "uploaded")} className="mb-8">
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="sample">Sample Papers</TabsTrigger>
+              <TabsTrigger value="uploaded">Upload PDFs</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="sample">
+              <Card className="p-6 bg-gradient-to-br from-primary/5 to-background">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <FileText className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg mb-2">Research Topic: AI for Climate Modeling</h3>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Agents will analyze {researchPapers.length} research papers comparing laboratory studies, 
+                      real-world deployments, and hybrid approaches to AI-powered climate prediction systems.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {researchPapers.map(paper => (
+                        <Badge key={paper.id} variant="outline" className="text-xs">
+                          Paper {paper.id}: {paper.year}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </Card>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="uploaded">
+              <PdfUploader onPapersExtracted={handlePapersExtracted} />
+              {uploadedPapers.length > 0 && (
+                <Card className="p-6 bg-gradient-to-br from-primary/5 to-background">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <FileText className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg mb-2">Your Uploaded Papers</h3>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {uploadedPapers.length} papers ready for agent analysis
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {uploadedPapers.map(paper => (
+                          <Badge key={paper.id} variant="outline" className="text-xs">
+                            {paper.fileName}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+            </TabsContent>
+          </Tabs>
         )}
         
         {/* Debate Viewer */}
