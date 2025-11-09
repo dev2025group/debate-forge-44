@@ -9,6 +9,10 @@ export const CriticAgent = {
   respond: function(papers, conversationHistory) {
     const turn = conversationHistory.length + 1;
     
+    // Analyze papers for potential issues
+    const paperTitles = papers.map(p => p.title);
+    const hasComparisons = papers.length > 1;
+    
     // Find most recent Researcher message
     const lastResearcherMessage = conversationHistory.filter(m => m.agent === "Researcher").slice(-1)[0];
     
@@ -23,22 +27,46 @@ export const CriticAgent = {
     
     // First critique
     if (conversationHistory.filter(m => m.agent === "Critic").length === 0) {
+      let critiqueContent = "I need to challenge several aspects of this analysis. ";
+      
+      if (hasComparisons) {
+        critiqueContent += "When comparing papers with different methodologies, we must be careful not to compare apples to oranges. ";
+        
+        const labPapers = papers.filter(p => 
+          p.methodology.toLowerCase().includes('lab') || 
+          p.methodology.toLowerCase().includes('simulation')
+        );
+        const fieldPapers = papers.filter(p => 
+          p.methodology.toLowerCase().includes('field') || 
+          p.methodology.toLowerCase().includes('deployment')
+        );
+        
+        if (labPapers.length > 0 && fieldPapers.length > 0) {
+          critiqueContent += `Laboratory studies and field deployments have fundamentally different objectives - lab studies establish theoretical bounds, while field studies tackle practical deployment challenges. `;
+        }
+      }
+      
+      critiqueContent += "We should examine whether the analysis adequately accounts for the stated limitations in each paper. ";
+      
+      const papersWithLimitations = papers.filter(p => 
+        p.limitations && p.limitations.length > 50
+      );
+      if (papersWithLimitations.length > 0) {
+        critiqueContent += `${papersWithLimitations.length} papers explicitly discuss limitations that may affect interpretation of results. `;
+      }
+      
       return {
         agent: "Critic",
-        content: `I need to challenge several aspects of this analysis. While you've identified a performance gap, you're comparing fundamentally different research objectives. Papers 1 and 2 explicitly state they're establishing theoretical bounds using synthetic data - they're not claiming these results transfer to real deployments. Meanwhile, Papers 3 and 4 are tackling entirely different problems: Paper 3 deals with agricultural regions with 23% missing data, and Paper 4 operates in one of Earth's most extreme environments. Comparing their results directly is misleading.`,
+        content: critiqueContent,
         challenges: [
-          "You're comparing apples to oranges: lab studies aim for theoretical benchmarks, field studies solve practical deployment problems",
-          "Paper 4's Arctic deployment faces unique challenges (polar night, extreme cold, hardware failures) not representative of general climate modeling",
-          "You didn't adequately emphasize that ALL papers acknowledge their limitations explicitly in their abstracts",
-          "The 'performance gap' framing suggests lab results are promises being broken, when they're actually methodological baselines",
-          "Paper 5's 78% accuracy in hybrid approach is actually impressive given it handles real-world data quality issues"
+          hasComparisons ? "Direct comparisons may not account for fundamental differences in research objectives and constraints" : "The analysis should consider the scope and context of each study",
+          "Different methodologies target different aspects of the problem - model performance vs. practical deployment",
+          papers.some(p => p.limitations.toLowerCase().includes('data')) ? "Data quality issues mentioned in limitations affect result interpretation" : "Environmental and operational constraints may explain performance variations",
+          "The framing of results should distinguish between theoretical capabilities and practical outcomes"
         ],
-        counterEvidence: [
-          "Paper 1 explicitly states: 'Real-world performance not validated' (limitations)",
-          "Paper 3's 67% accuracy comes with 23% missing data - that's not a fair comparison to perfect lab data",
-          "Paper 4 operates in conditions explicitly noted as 'unique challenges not applicable to temperate zones'",
-          "Paper 5 demonstrates hybrid approach reduces maintenance to bi-monthly vs. monthly - that's a practical win"
-        ],
+        counterEvidence: papers.slice(0, 2).map(p => 
+          `${p.title}: "${p.limitations.slice(0, 100)}..."`
+        ),
         questions: [
           "What would be a fair baseline for comparing real-world performance given data quality issues?",
           "Shouldn't we focus on Paper 5's hybrid approach as the most practical path forward?",

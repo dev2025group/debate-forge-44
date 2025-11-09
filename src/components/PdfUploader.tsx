@@ -1,8 +1,12 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Upload, FileText, X, Loader2 } from "lucide-react";
+import { Upload, FileText, X, Loader2, Play } from "lucide-react";
 import { toast } from "sonner";
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Set worker path
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface ParsedPaper {
   id: number;
@@ -15,6 +19,13 @@ interface ParsedPaper {
   year: number;
   source: string;
   fileName: string;
+  fullText: string;
+}
+
+interface UploadedFile {
+  file: File;
+  id: string;
+  name: string;
 }
 
 interface PdfUploaderProps {
@@ -22,47 +33,95 @@ interface PdfUploaderProps {
 }
 
 export const PdfUploader = ({ onPapersExtracted }: PdfUploaderProps) => {
-  const [uploading, setUploading] = useState(false);
-  const [papers, setPapers] = useState<ParsedPaper[]>([]);
-  const [currentFile, setCurrentFile] = useState<string>("");
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [parsing, setParsing] = useState(false);
+  const [currentParsing, setCurrentParsing] = useState<string>("");
+  const [parsedPapers, setParsedPapers] = useState<ParsedPaper[]>([]);
+
+  const extractTextFromPdf = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    
+    let fullText = '';
+    
+    // Extract text from each page
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(' ');
+      fullText += pageText + '\n';
+    }
+    
+    return fullText;
+  };
 
   const extractPaperData = (text: string, fileName: string, paperId: number): ParsedPaper => {
-    // Simple text parsing to extract paper sections
-    const lines = text.split('\n').filter(line => line.trim());
+    const lines = text.split('\n').filter(line => line.trim().length > 0);
+    const fullText = text.toLowerCase();
     
-    // Try to find title (usually first substantial line)
-    const title = lines.find(line => line.length > 20 && line.length < 200) || fileName.replace('.pdf', '');
+    // Extract title (usually near the start, capitalized, longer line)
+    const titleCandidates = lines.slice(0, 10).filter(line => 
+      line.length > 20 && line.length < 200 && /[A-Z]/.test(line)
+    );
+    const title = titleCandidates[0] || fileName.replace('.pdf', '');
     
-    // Look for abstract section
-    const abstractIdx = lines.findIndex(line => /abstract/i.test(line));
-    const abstract = abstractIdx >= 0 
-      ? lines.slice(abstractIdx + 1, abstractIdx + 5).join(' ').slice(0, 300)
-      : lines.slice(0, 3).join(' ').slice(0, 300);
+    // Find abstract
+    const abstractStart = lines.findIndex(line => 
+      /abstract|summary/i.test(line)
+    );
+    const abstract = abstractStart >= 0 
+      ? lines.slice(abstractStart + 1, abstractStart + 6)
+          .join(' ')
+          .slice(0, 400)
+          .trim()
+      : lines.slice(0, 5).join(' ').slice(0, 400).trim();
     
-    // Look for results/findings
-    const resultsIdx = lines.findIndex(line => /results?|findings?/i.test(line));
-    const results = resultsIdx >= 0
-      ? lines.slice(resultsIdx + 1, resultsIdx + 4).join(' ').slice(0, 200)
-      : "Results extracted from document";
+    // Find results/findings
+    const resultsStart = lines.findIndex(line => 
+      /^results?$|^findings?$|^outcomes?$/i.test(line.trim())
+    );
+    const results = resultsStart >= 0
+      ? lines.slice(resultsStart + 1, resultsStart + 5)
+          .join(' ')
+          .slice(0, 300)
+          .trim()
+      : "Results section not clearly identified";
     
-    // Look for methodology
-    const methodIdx = lines.findIndex(line => /method|approach|experiment/i.test(line));
-    const methodology = methodIdx >= 0
-      ? lines.slice(methodIdx + 1, methodIdx + 3).join(' ').slice(0, 200)
-      : "Methodology described in paper";
+    // Find methodology
+    const methodStart = lines.findIndex(line => 
+      /^method|^methodology|^approach|^experimental/i.test(line.trim())
+    );
+    const methodology = methodStart >= 0
+      ? lines.slice(methodStart + 1, methodStart + 4)
+          .join(' ')
+          .slice(0, 300)
+          .trim()
+      : "Methodology section not clearly identified";
     
-    // Look for limitations/discussion
-    const limitIdx = lines.findIndex(line => /limitation|discussion|future work/i.test(line));
-    const limitations = limitIdx >= 0
-      ? lines.slice(limitIdx + 1, limitIdx + 3).join(' ').slice(0, 200)
-      : "Limitations discussed in paper";
+    // Find limitations
+    const limitStart = lines.findIndex(line => 
+      /limitation|constraint|challenge|future work/i.test(line)
+    );
+    const limitations = limitStart >= 0
+      ? lines.slice(limitStart + 1, limitStart + 4)
+          .join(' ')
+          .slice(0, 250)
+          .trim()
+      : "Limitations not explicitly stated";
     
-    // Extract key findings (look for bullet points or numbered lists)
-    const keyFindings = lines
-      .filter(line => /^[\d\-•]/.test(line.trim()) || /conclude|find|show/i.test(line))
-      .slice(0, 3)
-      .join(' ')
-      .slice(0, 300) || "Key findings extracted from analysis";
+    // Extract key findings (look for numbered points, percentages, or conclusion statements)
+    const findingsLines = lines.filter(line => 
+      /\d+%|\d+\.\d+|conclude|demonstrate|show that|found that|achieve/i.test(line)
+    ).slice(0, 4);
+    const keyFindings = findingsLines.length > 0
+      ? findingsLines.join(' ').slice(0, 350).trim()
+      : "Key findings extracted from full text";
+    
+    // Try to extract year
+    const yearMatch = text.match(/\b(20\d{2})\b/);
+    const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
     
     return {
       id: paperId,
@@ -72,162 +131,234 @@ export const PdfUploader = ({ onPapersExtracted }: PdfUploaderProps) => {
       methodology,
       results,
       limitations,
-      year: new Date().getFullYear(),
+      year,
       source: fileName,
-      fileName
+      fileName,
+      fullText: text.slice(0, 5000) // Store first 5000 chars for agent analysis
     };
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    setUploading(true);
+    const newFiles: UploadedFile[] = Array.from(files).map((file, idx) => ({
+      file,
+      id: `${Date.now()}-${idx}`,
+      name: file.name
+    }));
+
+    setUploadedFiles(prev => [...prev, ...newFiles]);
+    toast.success(`${newFiles.length} file(s) uploaded. Click "Parse PDFs" to extract data.`);
+    e.target.value = '';
+  };
+
+  const removeFile = (id: string) => {
+    setUploadedFiles(prev => prev.filter(f => f.id !== id));
+    toast.info('File removed');
+  };
+
+  const parseAllFiles = async () => {
+    if (uploadedFiles.length === 0) {
+      toast.error("No files to parse");
+      return;
+    }
+
+    setParsing(true);
     const newPapers: ParsedPaper[] = [];
 
     try {
-      // Process files one by one to avoid timeout
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        setCurrentFile(file.name);
+      for (let i = 0; i < uploadedFiles.length; i++) {
+        const uploadedFile = uploadedFiles[i];
+        setCurrentParsing(uploadedFile.name);
         
-        toast.info(`Processing ${file.name}...`);
+        toast.info(`Parsing ${i + 1}/${uploadedFiles.length}: ${uploadedFile.name}`);
 
-        // Create a temporary file path for parsing
-        const formData = new FormData();
-        formData.append('file', file);
-
-        // Read file as array buffer
-        const arrayBuffer = await file.arrayBuffer();
-        const blob = new Blob([arrayBuffer], { type: file.type });
-        
-        // Create object URL for the file
-        const fileUrl = URL.createObjectURL(blob);
-        
         try {
-          // For now, we'll use a simple text extraction
-          // In production, you'd use a proper PDF parsing library or API
-          const reader = new FileReader();
-          
-          const text = await new Promise<string>((resolve, reject) => {
-            reader.onload = (event) => {
-              const result = event.target?.result as string;
-              // Simple text extraction (this is basic, a real implementation would use pdf.js or similar)
-              resolve(result || "");
-            };
-            reader.onerror = reject;
-            reader.readAsText(file);
-          });
-
-          const paper = extractPaperData(text, file.name, papers.length + i + 1);
+          const text = await extractTextFromPdf(uploadedFile.file);
+          const paper = extractPaperData(text, uploadedFile.name, parsedPapers.length + i + 1);
           newPapers.push(paper);
           
-          toast.success(`Extracted: ${file.name}`);
+          toast.success(`✓ Extracted: ${uploadedFile.name}`);
           
-          // Small delay between files
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // Small delay between files to show progress
+          await new Promise(resolve => setTimeout(resolve, 800));
           
         } catch (error) {
-          console.error(`Error parsing ${file.name}:`, error);
-          toast.error(`Failed to parse ${file.name}`);
+          console.error(`Error parsing ${uploadedFile.name}:`, error);
+          toast.error(`Failed to parse ${uploadedFile.name}`);
         }
-        
-        URL.revokeObjectURL(fileUrl);
       }
 
       if (newPapers.length > 0) {
-        const updatedPapers = [...papers, ...newPapers];
-        setPapers(updatedPapers);
+        const updatedPapers = [...parsedPapers, ...newPapers];
+        setParsedPapers(updatedPapers);
         onPapersExtracted(updatedPapers);
-        toast.success(`Successfully extracted ${newPapers.length} paper(s)`);
+        toast.success(`Successfully parsed ${newPapers.length} paper(s)!`);
+        
+        // Clear uploaded files after successful parsing
+        setUploadedFiles([]);
       }
     } catch (error) {
-      console.error('Upload error:', error);
-      toast.error('Failed to process PDFs');
+      console.error('Parsing error:', error);
+      toast.error('Failed to parse PDFs');
     } finally {
-      setUploading(false);
-      setCurrentFile("");
-      e.target.value = '';
+      setParsing(false);
+      setCurrentParsing("");
     }
   };
 
-  const removePaper = (id: number) => {
-    const updated = papers.filter(p => p.id !== id);
-    setPapers(updated);
+  const removeParsedPaper = (id: number) => {
+    const updated = parsedPapers.filter(p => p.id !== id);
+    setParsedPapers(updated);
     onPapersExtracted(updated);
-    toast.info('Paper removed');
+    toast.info('Paper removed from analysis');
   };
 
   return (
-    <Card className="p-6 mb-8">
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <h3 className="text-lg font-semibold mb-1">Upload Research Papers</h3>
-          <p className="text-sm text-muted-foreground">
-            Upload PDF files (2 pages max recommended). Papers will be parsed and analyzed by agents.
-          </p>
+    <div className="space-y-4">
+      <Card className="p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold mb-1">Upload Research Papers</h3>
+            <p className="text-sm text-muted-foreground">
+              Step 1: Upload PDF files (2-3 pages recommended for best results)
+            </p>
+          </div>
+          <label htmlFor="pdf-upload">
+            <Button asChild disabled={parsing}>
+              <span className="cursor-pointer">
+                <Upload className="w-4 h-4 mr-2" />
+                Upload PDFs
+              </span>
+            </Button>
+          </label>
+          <input
+            id="pdf-upload"
+            type="file"
+            accept=".pdf"
+            multiple
+            onChange={handleFileUpload}
+            className="hidden"
+            disabled={parsing}
+          />
         </div>
-        <label htmlFor="pdf-upload">
-          <Button asChild disabled={uploading}>
-            <span className="cursor-pointer">
-              {uploading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Upload className="w-4 h-4 mr-2" />
-                  Upload PDFs
-                </>
-              )}
-            </span>
-          </Button>
-        </label>
-        <input
-          id="pdf-upload"
-          type="file"
-          accept=".pdf"
-          multiple
-          onChange={handleFileUpload}
-          className="hidden"
-          disabled={uploading}
-        />
-      </div>
 
-      {uploading && currentFile && (
-        <div className="mb-4 p-3 bg-primary/5 rounded-lg">
-          <p className="text-sm text-muted-foreground">Processing: {currentFile}</p>
-        </div>
-      )}
-
-      {papers.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Extracted Papers ({papers.length})</p>
-          {papers.map((paper) => (
-            <div
-              key={paper.id}
-              className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-            >
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <FileText className="w-4 h-4 text-primary flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{paper.title}</p>
-                  <p className="text-xs text-muted-foreground">{paper.fileName}</p>
-                </div>
-              </div>
+        {uploadedFiles.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Uploaded Files ({uploadedFiles.length})</p>
               <Button
-                variant="ghost"
+                onClick={parseAllFiles}
+                disabled={parsing}
                 size="sm"
-                onClick={() => removePaper(paper.id)}
-                className="flex-shrink-0"
+                className="gap-2"
               >
-                <X className="w-4 h-4" />
+                {parsing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Parsing...
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4" />
+                    Parse All PDFs
+                  </>
+                )}
               </Button>
             </div>
-          ))}
-        </div>
+
+            {parsing && currentParsing && (
+              <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  <p className="text-sm font-medium">Currently parsing: {currentParsing}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {uploadedFiles.map((uploadedFile) => (
+                <div
+                  key={uploadedFile.id}
+                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border"
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{uploadedFile.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(uploadedFile.file.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeFile(uploadedFile.id)}
+                    disabled={parsing}
+                    className="flex-shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {uploadedFiles.length === 0 && parsedPapers.length === 0 && (
+          <div className="text-center py-8 border-2 border-dashed rounded-lg">
+            <Upload className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">No files uploaded yet</p>
+            <p className="text-xs text-muted-foreground mt-1">Upload PDF research papers to begin</p>
+          </div>
+        )}
+      </Card>
+
+      {parsedPapers.length > 0 && (
+        <Card className="p-6">
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold mb-1">Parsed Papers ({parsedPapers.length})</h3>
+            <p className="text-sm text-muted-foreground">
+              Ready for agent analysis
+            </p>
+          </div>
+          <div className="space-y-3">
+            {parsedPapers.map((paper) => (
+              <div
+                key={paper.id}
+                className="p-4 bg-primary/5 rounded-lg border border-primary/20"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="w-4 h-4 text-primary flex-shrink-0" />
+                      <p className="text-sm font-semibold truncate">{paper.title}</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
+                      {paper.abstract}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>Source: {paper.fileName}</span>
+                      <span>•</span>
+                      <span>Year: {paper.year}</span>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeParsedPaper(paper.id)}
+                    className="flex-shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
       )}
-    </Card>
+    </div>
   );
 };

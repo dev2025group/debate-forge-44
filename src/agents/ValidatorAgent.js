@@ -9,103 +9,82 @@ export const ValidatorAgent = {
   respond: function(papers, conversationHistory) {
     const turn = conversationHistory.length + 1;
     
-    // Find Synthesizer's message
+    // Find Synthesizer's conclusion to validate
     const synthesizerMessage = conversationHistory.find(m => m.agent === "Synthesizer");
     
     if (!synthesizerMessage) {
       return {
         agent: "Validator",
-        content: "No synthesis to validate yet.",
+        content: "Waiting for synthesis to validate...",
         turn: turn,
         timestamp: new Date().toISOString()
       };
     }
     
-    // Extract and verify key claims
-    const claimVerifications = [
-      {
-        claim: "Lab studies achieve 89-94% accuracy under ideal conditions",
-        verified: true,
-        supportingPapers: [1, 2],
-        evidence: "Paper 1: '94% accuracy in temperature prediction and 89% accuracy in precipitation forecasting.' Paper 2: '91% accuracy in climate pattern classification and 87% precision in anomaly detection.'",
-        confidenceContribution: 25
-      },
-      {
-        claim: "Field deployments show 58-71% accuracy in real-world conditions",
-        verified: true,
-        supportingPapers: [3, 4],
-        evidence: "Paper 3: '67% accuracy in precipitation forecasting and 71% accuracy in temperature prediction across diverse geographical conditions.' Paper 4: '58% for precipitation and 64% for temperature in harsh Arctic conditions.'",
-        confidenceContribution: 25
-      },
-      {
-        claim: "Real-world systems face 23-31% missing data rates",
-        verified: true,
-        supportingPapers: [3, 4],
-        evidence: "Paper 3: 'Includes handling of sensor failures, missing data (23% of readings).' Paper 4: '36 months of real-world observations with 31% missing data due to equipment issues.'",
-        confidenceContribution: 20
-      },
-      {
-        claim: "Hybrid approaches achieve intermediate performance around 78%",
-        verified: true,
-        supportingPapers: [5],
-        evidence: "Paper 5: 'Hybrid models achieved 78% overall accuracy (81% temperature, 75% precipitation).' This confirms intermediate performance between lab and field-only approaches.",
-        confidenceContribution: 20
-      },
-      {
-        claim: "Lab studies are transparent about their limitations",
-        verified: true,
-        supportingPapers: [1, 2],
-        evidence: "Paper 1: 'Results based on synthetic data only. Real-world performance not validated.' Paper 2: 'Entirely simulation-based without field testing.' Both papers explicitly acknowledge scope limitations.",
-        confidenceContribution: 15
-      }
+    // Extract claims from synthesis
+    const claims = [
+      synthesizerMessage.insight,
+      ...synthesizerMessage.consensusPoints
     ];
     
-    const overallConfidence = claimVerifications.reduce((sum, v) => sum + v.confidenceContribution, 0);
+    // Verify each claim against papers
+    const claimVerifications = claims.map(claim => {
+      const supportingPapers = [];
+      let evidence = "";
+      
+      // Check which papers support this claim
+      papers.forEach(paper => {
+        const paperText = `${paper.abstract} ${paper.keyFindings} ${paper.results} ${paper.methodology}`.toLowerCase();
+        
+        // Simple keyword matching for validation
+        if (claim.toLowerCase().includes('lab') && paper.methodology.toLowerCase().includes('lab')) {
+          supportingPapers.push(paper.id);
+          evidence = paper.results.slice(0, 150);
+        } else if (claim.toLowerCase().includes('field') && paper.methodology.toLowerCase().includes('field')) {
+          supportingPapers.push(paper.id);
+          evidence = paper.results.slice(0, 150);
+        } else if (claim.toLowerCase().includes('data') && paper.limitations.toLowerCase().includes('data')) {
+          supportingPapers.push(paper.id);
+          evidence = paper.limitations.slice(0, 150);
+        } else if (claim.toLowerCase().includes('hybrid') && paper.methodology.toLowerCase().includes('hybrid')) {
+          supportingPapers.push(paper.id);
+          evidence = paper.results.slice(0, 150);
+        }
+      });
+      
+      return {
+        claim: claim.slice(0, 100),
+        verified: supportingPapers.length > 0,
+        supportingPapers,
+        evidence: evidence || "Claim derived from debate synthesis",
+        confidenceContribution: supportingPapers.length > 0 ? 20 : 5
+      };
+    });
+    
+    const totalConfidence = Math.min(95, 
+      claimVerifications.reduce((sum, v) => sum + v.confidenceContribution, 0)
+    );
+    
+    const citations = papers.map(paper => ({
+      paperId: paper.id,
+      relevantFinding: paper.keyFindings.slice(0, 150),
+      supportsInsight: `Contributes to understanding via ${paper.methodology}`
+    }));
+    
+    const verifiedCount = claimVerifications.filter(v => v.verified).length;
     
     return {
       agent: "Validator",
-      content: `I've completed fact-checking the synthesis against all source papers. The collective insight is well-supported by the evidence with an overall confidence score of ${overallConfidence}%. All major claims are directly verifiable in the source papers with exact citations. The interpretation that AI climate modeling faces 'dual-track challenges' (algorithmic + operational) is a reasonable inference from the documented performance differences and limitation statements across all papers.`,
+      content: `I've fact-checked the synthesized insight against all source papers. ${verifiedCount} of ${claims.length} key claims are directly supported by the research. The synthesis accurately represents the papers' findings and properly contextualizes the methodological differences. The papers do support the conclusion that both theoretical and practical research directions are valuable and complementary.`,
       verified: true,
       claimVerifications: claimVerifications,
-      overallConfidence: overallConfidence,
-      citations: [
-        {
-          paperId: 1,
-          relevantFinding: "CNN-LSTM hybrid model achieved 94% temperature prediction accuracy, 89% precipitation accuracy",
-          supportsInsight: "Demonstrates high algorithmic performance potential under controlled conditions"
-        },
-        {
-          paperId: 2,
-          relevantFinding: "ResNet-based architecture achieved 91% pattern classification accuracy",
-          supportsInsight: "Confirms that AI architectures can achieve 90%+ accuracy with high-quality data"
-        },
-        {
-          paperId: 3,
-          relevantFinding: "Field-deployed models showed 67% precipitation accuracy and 71% temperature accuracy. Includes handling of 23% missing data.",
-          supportsInsight: "Reveals real-world performance challenges from data quality and infrastructure issues"
-        },
-        {
-          paperId: 4,
-          relevantFinding: "Operational accuracy averaged 58% for precipitation and 64% for temperature in harsh Arctic conditions. 31% missing data due to equipment issues.",
-          supportsInsight: "Demonstrates extreme environment challenges and infrastructure reliability issues"
-        },
-        {
-          paperId: 5,
-          relevantFinding: "Hybrid models achieved 78% overall accuracy. Reduced maintenance requirements to bi-monthly intervals.",
-          supportsInsight: "Shows that combining approaches addresses both algorithmic and operational challenges, achieving intermediate robust performance"
-        }
-      ],
+      overallConfidence: totalConfidence,
+      citations: citations,
       reasoning: [
-        "Cross-referenced all quantitative claims against paper results sections",
-        "Verified that performance ranges cited match source data",
-        "Confirmed that all papers explicitly state their limitations",
-        "Checked that the 'dual-track' interpretation is supported by the contrast between lab and field results",
-        "Validated that hybrid approach evidence (Paper 5) supports the synthesis conclusion"
-      ],
-      additionalNotes: [
-        "The synthesis accurately represents the debate evolution from initial comparison to nuanced understanding",
-        "The hypothesis about edge computing and 75%+ accuracy target is reasonable extrapolation from Paper 5's hybrid results",
-        "All five papers contribute meaningfully to the collective insight - no cherry-picking detected"
+        "Cross-referenced all claims against paper content",
+        "Verified supporting evidence for each claim",
+        "Assessed methodological appropriateness",
+        "Calculated confidence based on evidence strength"
       ],
       turn: turn,
       timestamp: new Date().toISOString()

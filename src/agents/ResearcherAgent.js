@@ -9,101 +9,121 @@ export const ResearcherAgent = {
   respond: function(papers, conversationHistory) {
     const turn = conversationHistory.length + 1;
     
-    // First turn: Initial analysis
+    // Analyze the actual papers provided
+    const methodologies = {};
+    const accuracyNumbers = [];
+    
+    papers.forEach(paper => {
+      const method = paper.methodology.toLowerCase();
+      if (method.includes('lab') || method.includes('simulation') || method.includes('synthetic')) {
+        methodologies['laboratory'] = (methodologies['laboratory'] || 0) + 1;
+      } else if (method.includes('field') || method.includes('real-world') || method.includes('deployment')) {
+        methodologies['field'] = (methodologies['field'] || 0) + 1;
+      } else if (method.includes('hybrid')) {
+        methodologies['hybrid'] = (methodologies['hybrid'] || 0) + 1;
+      } else {
+        methodologies['other'] = (methodologies['other'] || 0) + 1;
+      }
+      
+      // Extract percentage numbers from results
+      const percentMatches = paper.results.match(/(\d+(?:\.\d+)?)\s*%/g);
+      if (percentMatches) {
+        percentMatches.forEach(match => {
+          const num = parseFloat(match);
+          if (num > 0 && num <= 100) accuracyNumbers.push(num);
+        });
+      }
+    });
+    
+    // First analysis
     if (conversationHistory.length === 0) {
-      // Analyze methodology types
-      const methodologies = {};
-      papers.forEach(paper => {
-        const type = paper.methodology.includes("laboratory") || paper.methodology.includes("simulation") ? "Lab/Simulation" :
-                     paper.methodology.includes("field") || paper.methodology.includes("deployment") ? "Real-World" :
-                     "Hybrid";
-        methodologies[type] = (methodologies[type] || 0) + 1;
-      });
+      const avgAccuracy = accuracyNumbers.length > 0 
+        ? (accuracyNumbers.reduce((a, b) => a + b, 0) / accuracyNumbers.length).toFixed(1)
+        : "N/A";
       
-      // Extract accuracy ranges
-      const accuracies = papers.map(p => {
-        const match = p.results.match(/(\d+)%/g);
-        return match ? match.map(m => parseInt(m)) : [];
-      }).flat();
+      const labPapers = papers.filter(p => 
+        p.methodology.toLowerCase().includes('lab') || 
+        p.methodology.toLowerCase().includes('simulation')
+      );
+      const fieldPapers = papers.filter(p => 
+        p.methodology.toLowerCase().includes('field') || 
+        p.methodology.toLowerCase().includes('deployment')
+      );
       
-      const avgLabAccuracy = papers
-        .filter(p => p.methodology.includes("laboratory") || p.methodology.includes("simulation"))
-        .map(p => p.results.match(/(\d+)%/g))
-        .flat()
-        .map(m => parseInt(m))
-        .reduce((sum, val, _, arr) => sum + val / arr.length, 0);
+      let analysisContent = `I've analyzed all ${papers.length} research papers. `;
       
-      const avgRealWorldAccuracy = papers
-        .filter(p => p.methodology.includes("field") || p.methodology.includes("deployment"))
-        .map(p => p.results.match(/(\d+)%/g))
-        .flat()
-        .map(m => parseInt(m))
-        .reduce((sum, val, _, arr) => sum + val / arr.length, 0);
+      if (labPapers.length > 0 && fieldPapers.length > 0) {
+        analysisContent += `I notice ${labPapers.length} laboratory/simulation studies and ${fieldPapers.length} field deployment studies. `;
+        analysisContent += `Lab studies tend to report higher performance metrics, while field studies show more modest results, likely due to real-world constraints like data quality issues, sensor failures, and environmental factors. `;
+      } else {
+        analysisContent += `The papers use diverse methodologies: ${Object.entries(methodologies).map(([k, v]) => `${v} ${k}`).join(', ')}. `;
+      }
+      
+      if (accuracyNumbers.length > 0) {
+        const maxAcc = Math.max(...accuracyNumbers);
+        const minAcc = Math.min(...accuracyNumbers);
+        analysisContent += `Performance metrics range from ${minAcc.toFixed(1)}% to ${maxAcc.toFixed(1)}%, with an average of ${avgAccuracy}%. `;
+      }
+      
+      // Find common themes in limitations
+      const commonLimitations = papers.filter(p => 
+        p.limitations.toLowerCase().includes('data') || 
+        p.limitations.toLowerCase().includes('missing')
+      );
+      if (commonLimitations.length > 0) {
+        analysisContent += `${commonLimitations.length} papers explicitly mention data quality or missing data as key limitations. `;
+      }
       
       return {
         agent: "Researcher",
-        content: `I've analyzed all ${papers.length} papers on AI for climate modeling. I've identified a striking pattern: there's a significant performance gap between laboratory studies and real-world deployments. Lab studies (Papers 1 & 2) consistently report 89-94% accuracy, while field deployments (Papers 3 & 4) show much lower performance at 58-71% accuracy. This suggests the technology works well in controlled conditions but faces substantial challenges in practice.`,
+        content: analysisContent,
         analysis: {
-          patternsFound: [
-            "Lab studies show 89-94% accuracy vs. 58-71% in real-world deployments",
-            "Simulation-based studies don't account for missing data, sensor failures, or extreme conditions",
-            "Real-world studies cite 23-31% missing data rates as major challenge",
-            "Hybrid approaches (Paper 5) achieve intermediate performance at 78%",
-            "Cost increases dramatically for real deployments ($28K-$45K per station)"
-          ],
-          claimsExtracted: [
-            "Lab models achieve 94% temperature prediction accuracy (Paper 1)",
-            "Field deployments show 67% precipitation accuracy in practice (Paper 3)",
-            "Arctic conditions reduce performance by additional 15-20% (Paper 4)",
-            "Hybrid models balance accuracy and robustness at 78% (Paper 5)"
-          ],
-          methodologyBreakdown: methodologies,
-          accuracyRanges: {
-            lab: "89-94%",
-            realWorld: "58-71%",
-            hybrid: "78%"
-          }
+          patternsFound: Object.entries(methodologies).map(([method, count]) => 
+            `${count} paper(s) using ${method} methodology`
+          ).concat(
+            accuracyNumbers.length > 0 
+              ? [`Performance metrics range: ${Math.min(...accuracyNumbers).toFixed(1)}%-${Math.max(...accuracyNumbers).toFixed(1)}%`]
+              : []
+          ),
+          claimsExtracted: papers.slice(0, 3).map(p => 
+            `${p.title}: ${p.keyFindings.slice(0, 100)}...`
+          ),
+          methodologyBreakdown: methodologies
         },
         reasoning: [
-          "Grouped papers by methodology type to identify systematic differences",
-          "Extracted all quantitative performance metrics from results sections",
-          "Compared controlled vs. uncontrolled environment performance",
-          "Noted that lab studies explicitly acknowledge lack of real-world validation",
-          "Identified cost and maintenance as practical barriers to deployment"
+          "Analyzed all papers systematically across methodologies",
+          "Extracted and compared quantitative metrics where available",
+          "Identified common themes in limitations and challenges",
+          "Noted relationships between methodology and reported outcomes"
         ],
-        references: [1, 2, 3, 4, 5],
+        references: papers.map(p => p.id),
         turn: turn,
         timestamp: new Date().toISOString()
       };
     }
     
-    // Response to Critic's challenge
+    // Response to Critic
     const lastCriticMessage = conversationHistory.filter(m => m.agent === "Critic").slice(-1)[0];
     
     if (lastCriticMessage) {
       return {
         agent: "Researcher",
-        content: `You raise excellent points about the context of these studies. I acknowledge that my initial comparison may have been too simplistic. The lab studies explicitly state they're establishing theoretical performance bounds, not making claims about real-world applicability. However, I still maintain that the gap is significant and worth highlighting - even Paper 5's hybrid approach, which attempts to bridge this divide, achieves 78% accuracy, suggesting there are fundamental challenges in translating controlled performance to operational systems. The limitations sections across all papers consistently cite data quality, missing observations, and extreme conditions as persistent issues.`,
+        content: `You raise valid points about research context. I acknowledge that comparing different methodologies requires careful consideration of their respective objectives. Lab studies establish theoretical benchmarks, while field studies address practical deployment challenges. The performance differences likely reflect these different problem scopes rather than simple shortcomings. I'll revise my analysis to better account for these contextual factors and the explicit limitations stated in each paper.`,
         analysis: {
           revisedClaims: [
-            "Lab studies serve as theoretical benchmarks, not deployment predictions",
-            "Real-world performance gap (15-30% lower) stems from systematic factors: missing data, sensor failures, extreme conditions",
-            "Even optimized hybrid approaches face a 10-15% accuracy penalty in practice",
-            "Cost-performance tradeoffs make high-accuracy deployments economically challenging"
-          ],
-          acknowledgedLimitations: [
-            "Lab studies are transparent about their synthetic data limitations",
-            "Different papers target different use cases and environmental conditions",
-            "Arctic study (Paper 4) deals with uniquely challenging conditions"
+            "Different methodologies serve different research purposes",
+            "Performance variations reflect problem scope differences",
+            "Practical constraints (data quality, environmental factors) explain field study results",
+            "Both theoretical and practical research contribute valuable insights"
           ]
         },
         reasoning: [
-          "Reviewed limitations sections of lab studies - they're explicit about scope",
-          "Re-examined Papers 3 and 5 for practical success factors",
-          "Acknowledged that comparing Arctic conditions to general deployment is unfair",
-          "Still maintain that the 15-30% accuracy gap across all non-lab studies indicates systematic challenges"
+          "Reconsidered the fairness of direct comparisons",
+          "Reviewed stated limitations in each paper",
+          "Acknowledged different research objectives",
+          "Maintained focus on systematic patterns while respecting context"
         ],
-        references: [1, 2, 3, 5],
+        references: papers.map(p => p.id),
         turn: turn,
         timestamp: new Date().toISOString()
       };
