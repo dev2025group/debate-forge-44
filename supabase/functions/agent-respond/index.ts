@@ -7,69 +7,132 @@ const corsHeaders = {
 };
 
 const AGENT_PROMPTS = {
-  Researcher: `You are Dr. Research, a meticulous research analyst. Structure your analysis with these sections:
+  Researcher: `You are Dr. Research, a meticulous research analyst.
+
+CRITICAL: You MUST format your response using EXACTLY this structure with ## headers:
 
 ## Key Patterns
-[2-3 main patterns you observed across papers]
+- Pattern 1 (cite papers)
+- Pattern 2 (cite papers)
 
 ## Major Findings
-[Specific discoveries with paper references]
+- Finding 1 with Paper X reference
+- Finding 2 with Paper Y reference
 
 ## Methodologies Observed
-[Brief comparison of approaches used]
+- Brief methodology comparison
 
 ## Research Gaps
-[What's missing or needs further study]
+- Gap 1
+- Gap 2
 
-Keep each section focused. Use bullet points within sections. Always cite papers (e.g., "Paper 1", "Paper 2").`,
+RULES:
+- Start EVERY section with ## followed by exact section name
+- Use bullet points (- or *) within sections
+- Keep CONCISE - max 2-3 bullets per section
+- DO NOT use **bold text** for section headers
+- DO NOT write paragraphs - use bullets
 
-  Critic: `You are Dr. Critical, a rigorous critic. Structure your critique with these sections:
+EXAMPLE:
+## Key Patterns
+- All papers show ubiquitous microplastic presence (Papers 1, 2, 3)
+- Primary human exposure through oral intake`,
+
+  Critic: `You are Dr. Critical, a rigorous critic.
+
+CRITICAL: You MUST format your response using EXACTLY this structure with ## headers:
 
 ## Methodological Concerns
-[Issues with how analyses were done]
+- Concern 1
+- Concern 2
 
 ## Questionable Assumptions
-[What needs more evidence]
+- Assumption 1 that needs evidence
+- Assumption 2 that needs evidence
 
 ## Overlooked Factors
-[What wasn't considered]
+- Factor 1
+- Factor 2
 
 ## Constructive Questions
-[2-3 questions to improve the analysis]
+- Question 1?
+- Question 2?
 
-Be specific and cite examples.`,
+RULES:
+- Start EVERY section with ## followed by exact section name
+- Use bullet points only
+- Keep brief - max 2-3 bullets per section
+- DO NOT use **bold text** for headers
+- DO NOT write long paragraphs
 
-  Synthesizer: `You are Dr. Synthesis, who finds connections. Structure your synthesis with these sections:
+EXAMPLE:
+## Methodological Concerns
+- "Significant potential" overstates certainty from review-level evidence
+- Primary route claim lacks dose quantification across populations`,
+
+  Synthesizer: `You are Dr. Synthesis, who finds connections.
+
+CRITICAL: You MUST format your response using EXACTLY this structure with ## headers:
 
 ## Points of Agreement
-[Where all papers/agents converge]
+- Agreement 1
+- Agreement 2
+- Agreement 3
 
 ## Novel Connections
-[New insights from combining perspectives]
+- Connection 1 between papers/agents
+- Connection 2 between papers/agents
 
 ## Proposed Hypothesis
-[What this collectively suggests]
+- Hypothesis based on synthesis
 
 ## Future Research Directions
-[Where to go next]
+- Direction 1
+- Direction 2
 
-Build bridges between ideas.`,
+RULES:
+- Start EVERY section with ## followed by exact section name
+- Use bullet points only
+- Max 3 bullets per section
+- DO NOT use **bold text**
+- Focus on synthesis, not repetition
 
-  Validator: `You are Dr. Verify, an evidence-based validator. Structure your validation with these sections:
+EXAMPLE:
+## Points of Agreement
+- All papers confirm ubiquitous MP presence in environment and human body
+- Inflammation and oxidative stress are key mechanisms`,
+
+  Validator: `You are Dr. Verify, an evidence-based validator.
+
+CRITICAL: You MUST format your response using EXACTLY this structure with ## headers:
 
 ## Verified Claims
-[Claims you can confirm with evidence - cite specific papers]
+- ✓ Claim 1 (cite Paper X, page/section)
+- ✓ Claim 2 (cite Paper Y, page/section)
 
 ## Confidence Assessment
-[Rate overall confidence: High/Medium/Low and why]
+- Overall confidence: High/Medium/Low
+- Reasoning in 1 sentence
 
 ## Areas of Uncertainty
-[What needs more evidence]
+- Uncertainty 1
+- Uncertainty 2
 
 ## Key Citations
-[Specific quotes or findings from papers]
+- Paper X: "quote" supports claim Y
+- Paper Z: "quote" supports claim W
 
-Be precise and evidence-based.`
+RULES:
+- Start EVERY section with ## followed by exact section name
+- Use bullet points only
+- Max 3 items per section
+- Always cite specific papers
+- DO NOT use **bold text**
+
+EXAMPLE:
+## Verified Claims
+- ✓ MPs detected in human placenta (Paper 1, Key Findings)
+- ✓ Oral intake is primary exposure route (Paper 2, Abstract)`
 };
 
 serve(async (req) => {
@@ -141,7 +204,7 @@ serve(async (req) => {
           }
         ],
         temperature: 0.7,
-        max_tokens: 800
+        max_tokens: 450
       }),
     });
 
@@ -166,15 +229,60 @@ serve(async (req) => {
     const data = await response.json();
     const agentResponse = data.choices[0].message.content;
 
-    // Parse sections from markdown
+    console.log(`Response from ${agentType}, length: ${agentResponse.length}`);
+
+    // Parse sections - try multiple formats
     const sections: Record<string, string> = {};
-    const sectionRegex = /## (.+?)\n([\s\S]*?)(?=\n## |$)/g;
+
+    // Strategy 1: Try ## markdown headers first (preferred)
+    let sectionRegex = /## (.+?)\n([\s\S]*?)(?=\n## |$)/g;
     let match;
 
     while ((match = sectionRegex.exec(agentResponse)) !== null) {
       const sectionTitle = match[1].trim();
       const sectionContent = match[2].trim();
       sections[sectionTitle] = sectionContent;
+    }
+
+    console.log(`Found ${Object.keys(sections).length} sections with ## format`);
+
+    // Strategy 2: If no ## sections, try **Bold:** format
+    if (Object.keys(sections).length === 0) {
+      console.log('No ## sections found, trying **bold:** format');
+      const boldRegex = /\*\*(.+?):\*\*\s*\n([\s\S]*?)(?=\n\*\*|\n\d+\.|$)/g;
+      
+      while ((match = boldRegex.exec(agentResponse)) !== null) {
+        const sectionTitle = match[1].trim();
+        const sectionContent = match[2].trim();
+        // Only add if content is substantial
+        if (sectionContent.length > 20) {
+          sections[sectionTitle] = sectionContent;
+        }
+      }
+      
+      console.log(`Found ${Object.keys(sections).length} sections with **bold:** format`);
+    }
+
+    // Strategy 3: If still nothing, try numbered sections like "1. **Title:**"
+    if (Object.keys(sections).length === 0) {
+      console.log('Trying numbered format');
+      const numberedRegex = /\d+\.\s+\*\*(.+?):\*\*\s*([\s\S]*?)(?=\n\d+\.|\n\n\*\*|$)/g;
+      
+      while ((match = numberedRegex.exec(agentResponse)) !== null) {
+        const sectionTitle = match[1].trim();
+        const sectionContent = match[2].trim();
+        if (sectionContent.length > 20) {
+          sections[sectionTitle] = sectionContent;
+        }
+      }
+      
+      console.log(`Found ${Object.keys(sections).length} sections with numbered format`);
+    }
+
+    // If still no sections, log the start of response for debugging
+    if (Object.keys(sections).length === 0) {
+      console.warn('WARNING: No sections found in any format!');
+      console.log('First 300 chars:', agentResponse.substring(0, 300));
     }
 
     return new Response(

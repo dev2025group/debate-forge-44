@@ -62,12 +62,33 @@ const AgentMessage = ({ message, agentColor, agentName, agentRole }: AgentMessag
       .split('\n')
       .map(line => {
         const trimmed = line.trim();
-        if (trimmed.startsWith('-') || trimmed.startsWith('*')) {
-          return `<li class="ml-4 mb-1">${trimmed.substring(1).trim()}</li>`;
+        
+        // Handle bullet points
+        if (trimmed.startsWith('-') || trimmed.startsWith('*') || trimmed.startsWith('•')) {
+          return `<li class="ml-4 mb-2 leading-relaxed">${trimmed.substring(1).trim()}</li>`;
         }
-        if (trimmed) {
-          return `<p class="mb-2">${trimmed}</p>`;
+        
+        // Handle numbered lists
+        if (/^\d+\./.test(trimmed)) {
+          return `<li class="ml-4 mb-2 leading-relaxed list-decimal">${trimmed.replace(/^\d+\.\s*/, '')}</li>`;
         }
+        
+        // Break long paragraphs at sentence boundaries
+        if (trimmed.length > 0) {
+          if (trimmed.length > 250) {
+            // Split at periods and make each sentence a paragraph
+            return trimmed
+              .split(/\.\s+/)
+              .filter(s => s.length > 0)
+              .map(sentence => {
+                const withPeriod = sentence.endsWith('.') ? sentence : sentence + '.';
+                return `<p class="mb-3 leading-relaxed">${withPeriod}</p>`;
+              })
+              .join('');
+          }
+          return `<p class="mb-3 leading-relaxed">${trimmed}</p>`;
+        }
+        
         return '';
       })
       .join('');
