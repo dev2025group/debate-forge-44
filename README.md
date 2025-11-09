@@ -186,9 +186,3 @@ MIT License – Feel free to use and adapt
 
 ```
 
----
-
-If you want, I can **also make a visually-enhanced version with badges, GIFs, and screenshots** so your GitHub README looks ultra-professional and hackathon-ready.  
-
-Do you want me to do that next?
-```
