@@ -7,37 +7,41 @@ const corsHeaders = {
 };
 
 const AGENT_PROMPTS = {
-  Researcher: `You are Dr. Research, a meticulous research analyst examining academic papers. Your role is to:
-- Identify key patterns and themes across the papers
-- Extract methodology details and performance metrics
-- Highlight interesting findings and connections
-- Present your analysis in a clear, structured way with specific references to the papers
+  Researcher: `You are Dr. Research, a meticulous research analyst. Respond in this EXACT JSON format:
+{
+  "summary": "1-2 sentence overview of your key finding",
+  "keyPoints": ["Point 1", "Point 2", "Point 3"],
+  "findings": "Main discovery or pattern (2-3 sentences max)",
+  "references": ["Paper 1", "Paper 2"]
+}
+Keep CONCISE. Max 3 key points. Under 200 words total. Always cite paper numbers.`,
 
-Be thorough but concise. Always cite which paper you're referencing.`,
+  Critic: `You are Dr. Critical, a skeptical peer reviewer. Respond in this EXACT JSON format:
+{
+  "summary": "1 sentence critique overview",
+  "challenges": ["Challenge 1", "Challenge 2"],
+  "questions": ["Question 1", "Question 2"],
+  "suggestion": "What would strengthen this analysis (1 sentence)"
+}
+Be specific but brief. Max 2-3 challenges. Focus on methodology and claims.`,
 
-  Critic: `You are Dr. Critical, a skeptical peer reviewer challenging research analyses. Your role is to:
-- Question assumptions and identify potential biases
-- Point out methodological differences that might affect comparisons
-- Highlight limitations and gaps in the research
-- Challenge overly broad generalizations
+  Synthesizer: `You are Dr. Synthesis, an integrative thinker. Respond in this EXACT JSON format:
+{
+  "insight": "Your main collective insight from the debate (2-3 sentences)",
+  "consensusPoints": ["Agreement 1", "Agreement 2", "Agreement 3"],
+  "hypothesis": "Novel research direction suggested by combining these perspectives (1-2 sentences)"
+}
+Focus on synthesis, not repetition. Under 150 words total. Build bridges between viewpoints.`,
 
-Be constructive but rigorous. Focus on improving the analysis quality.`,
-
-  Synthesizer: `You are Dr. Synthesis, an integrative thinker who finds common ground. Your role is to:
-- Reconcile different viewpoints from the debate
-- Identify consensus points and areas of agreement
-- Generate novel insights by connecting ideas across papers
-- Propose hypotheses for future research
-
-Be balanced and creative. Build bridges between different perspectives.`,
-
-  Validator: `You are Dr. Verify, a fact-checker ensuring accuracy. Your role is to:
-- Verify claims against the actual paper content
-- Check if conclusions are supported by evidence
-- Assign confidence levels to different claims
-- Provide specific citations for verification
-
-Be precise and evidence-based. Only confirm what can be directly verified.`
+  Validator: `You are Dr. Verify, a fact-checker. Respond in this EXACT JSON format:
+{
+  "summary": "Validation overview (1 sentence)",
+  "verified": ["Claim 1: Supported by Paper X", "Claim 2: Confirmed by Paper Y"],
+  "concerns": ["Potential issue 1", "Potential issue 2"],
+  "confidence": "High/Medium/Low",
+  "citations": ["Paper 1: Specific finding", "Paper 2: Supporting evidence"]
+}
+Max 3 verified claims, max 2 concerns. Be precise with citations.`
 };
 
 serve(async (req) => {
@@ -109,7 +113,8 @@ serve(async (req) => {
           }
         ],
         temperature: 0.7,
-        max_tokens: 800
+        max_tokens: 350,
+        response_format: { type: "json_object" }
       }),
     });
 
@@ -134,12 +139,30 @@ serve(async (req) => {
     const data = await response.json();
     const content = data.choices[0].message.content;
 
+    // Try to parse as JSON for structured output
+    let structuredResponse;
+    try {
+      structuredResponse = JSON.parse(content);
+    } catch (e) {
+      console.error('Failed to parse agent response as JSON:', e);
+      // Fallback to plain content
+      structuredResponse = { content: content };
+    }
+
+    // Determine display content based on agent type
+    const displayContent = structuredResponse.summary || 
+                          structuredResponse.insight || 
+                          structuredResponse.content || 
+                          content.substring(0, 200) + '...';
+
     return new Response(
       JSON.stringify({
         agent: agentType,
-        content: content,
+        content: displayContent,
         turn: conversationHistory.length + 1,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        // Include all structured fields
+        ...structuredResponse
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

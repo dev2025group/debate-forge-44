@@ -10,11 +10,22 @@ interface Message {
   content: string;
   turn: number;
   timestamp: string;
-  reasoning?: string[];
-  analysis?: any;
+  // Researcher fields
+  keyPoints?: string[];
+  findings?: string;
+  references?: string[];
+  // Critic fields
   challenges?: string[];
   questions?: string[];
+  suggestion?: string;
+  // Synthesizer fields
   insight?: string;
+  consensusPoints?: string[];
+  hypothesis?: string;
+  // Validator fields
+  verified?: string[];
+  concerns?: string[];
+  confidence?: string;
   citations?: any[];
   [key: string]: any;
 }
@@ -41,11 +52,12 @@ const AgentMessage = ({ message, agentColor, agentName, agentRole }: AgentMessag
   
   const getAgentInitial = (agent: string) => agent.charAt(0);
   
-  const hasDetails = message.reasoning?.length > 0 || 
-                     message.analysis || 
-                     message.challenges?.length > 0 ||
+  const hasDetails = message.findings ||
+                     message.hypothesis ||
                      message.questions?.length > 0 ||
-                     message.citations?.length > 0;
+                     message.citations?.length > 0 ||
+                     message.references?.length > 0 ||
+                     message.suggestion;
   
   return (
     <Card className={cn(
@@ -77,25 +89,84 @@ const AgentMessage = ({ message, agentColor, agentName, agentRole }: AgentMessag
             </div>
           </div>
           
-          {/* Main Content */}
+          {/* Main Content - Summary */}
           <div className="prose prose-sm max-w-none">
-            <p className="text-foreground leading-relaxed">{message.content}</p>
+            <p className="text-foreground leading-relaxed text-base font-medium">{message.content}</p>
           </div>
           
-          {/* Special Content Blocks */}
-          {message.insight && (
-            <div className="bg-synthesizer-bg border border-synthesizer-border rounded-lg p-4 mt-4">
-              <p className="text-sm font-medium text-synthesizer mb-2">💡 Collective Insight</p>
-              <p className="text-sm text-foreground">{message.insight}</p>
+          {/* Key Points - Researcher */}
+          {message.keyPoints && message.keyPoints.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {message.keyPoints.map((point: string, idx: number) => (
+                <Badge key={idx} variant="secondary" className="text-xs py-1 px-3">
+                  {point}
+                </Badge>
+              ))}
             </div>
           )}
           
+          {/* Consensus Points - Synthesizer */}
+          {message.consensusPoints && message.consensusPoints.length > 0 && (
+            <div className="bg-synthesizer-bg border border-synthesizer-border rounded-lg p-3 mt-3">
+              <p className="text-xs font-medium text-synthesizer mb-2">🤝 Points of Agreement</p>
+              <ul className="text-sm space-y-1">
+                {message.consensusPoints.map((point: string, idx: number) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-synthesizer mt-0.5">•</span>
+                    <span className="text-foreground">{point}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
+          {/* Verified Claims - Validator */}
+          {message.verified && message.verified.length > 0 && (
+            <div className="bg-validator-bg border border-validator-border rounded-lg p-3 mt-3">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-medium text-validator">✓ Verified Claims</p>
+                {message.confidence && (
+                  <Badge variant="outline" className="text-xs">
+                    {message.confidence} Confidence
+                  </Badge>
+                )}
+              </div>
+              <ul className="text-sm space-y-1">
+                {message.verified.map((claim: string, idx: number) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-validator mt-0.5">✓</span>
+                    <span className="text-foreground">{claim}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
+          {/* Concerns - Validator */}
+          {message.concerns && message.concerns.length > 0 && (
+            <div className="bg-critic-bg border border-critic-border rounded-lg p-3 mt-3">
+              <p className="text-xs font-medium text-critic mb-2">⚠️ Concerns</p>
+              <ul className="text-sm space-y-1">
+                {message.concerns.map((concern: string, idx: number) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-critic mt-0.5">•</span>
+                    <span className="text-foreground">{concern}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
+          {/* Challenges - Critic */}
           {message.challenges && message.challenges.length > 0 && (
-            <div className="bg-critic-bg border border-critic-border rounded-lg p-4 mt-4">
-              <p className="text-sm font-medium text-critic mb-2">⚠️ Challenges Raised</p>
-              <ul className="text-sm space-y-1 list-disc list-inside">
-                {message.challenges.slice(0, 2).map((challenge: string, idx: number) => (
-                  <li key={idx} className="text-foreground">{challenge}</li>
+            <div className="bg-critic-bg border border-critic-border rounded-lg p-3 mt-3">
+              <p className="text-xs font-medium text-critic mb-2">🔍 Critical Challenges</p>
+              <ul className="text-sm space-y-1">
+                {message.challenges.map((challenge: string, idx: number) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-critic mt-0.5">•</span>
+                    <span className="text-foreground">{challenge}</span>
+                  </li>
                 ))}
               </ul>
             </div>
@@ -116,20 +187,30 @@ const AgentMessage = ({ message, agentColor, agentName, agentRole }: AgentMessag
               
               {isExpanded && (
                 <div className="mt-3 space-y-3 text-sm bg-muted/50 rounded-lg p-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                  {message.reasoning && message.reasoning.length > 0 && (
+                  {message.findings && (
                     <div>
-                      <p className="font-medium mb-2">Reasoning Steps:</p>
-                      <ul className="space-y-1 list-disc list-inside text-muted-foreground">
-                        {message.reasoning.map((step: string, idx: number) => (
-                          <li key={idx}>{step}</li>
-                        ))}
-                      </ul>
+                      <p className="font-medium mb-2">📊 Detailed Findings:</p>
+                      <p className="text-muted-foreground">{message.findings}</p>
+                    </div>
+                  )}
+                  
+                  {message.hypothesis && (
+                    <div>
+                      <p className="font-medium mb-2">🔬 Research Hypothesis:</p>
+                      <p className="text-muted-foreground">{message.hypothesis}</p>
+                    </div>
+                  )}
+                  
+                  {message.suggestion && (
+                    <div>
+                      <p className="font-medium mb-2">💡 Suggestion:</p>
+                      <p className="text-muted-foreground">{message.suggestion}</p>
                     </div>
                   )}
                   
                   {message.questions && message.questions.length > 0 && (
                     <div>
-                      <p className="font-medium mb-2">Questions for Discussion:</p>
+                      <p className="font-medium mb-2">❓ Discussion Questions:</p>
                       <ul className="space-y-1 list-disc list-inside text-muted-foreground">
                         {message.questions.map((q: string, idx: number) => (
                           <li key={idx}>{q}</li>
@@ -140,12 +221,11 @@ const AgentMessage = ({ message, agentColor, agentName, agentRole }: AgentMessag
                   
                   {message.citations && message.citations.length > 0 && (
                     <div>
-                      <p className="font-medium mb-2">Citations:</p>
+                      <p className="font-medium mb-2">📚 Citations:</p>
                       <div className="space-y-2">
                         {message.citations.map((citation: any, idx: number) => (
-                          <div key={idx} className="bg-background rounded p-2">
-                            <p className="text-xs font-medium">Paper {citation.paperId}</p>
-                            <p className="text-xs text-muted-foreground mt-1">{citation.relevantFinding}</p>
+                          <div key={idx} className="bg-background rounded p-2 text-xs">
+                            <p className="text-muted-foreground">{citation}</p>
                           </div>
                         ))}
                       </div>
@@ -154,8 +234,14 @@ const AgentMessage = ({ message, agentColor, agentName, agentRole }: AgentMessag
                   
                   {message.references && message.references.length > 0 && (
                     <div>
-                      <p className="font-medium mb-2">References:</p>
-                      <p className="text-muted-foreground">Papers {message.references.join(", ")}</p>
+                      <p className="font-medium mb-2">📄 References:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {message.references.map((ref: string, idx: number) => (
+                          <Badge key={idx} variant="outline" className="text-xs">
+                            {ref}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
