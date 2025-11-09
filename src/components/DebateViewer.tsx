@@ -1,5 +1,7 @@
+import { useRef } from "react";
 import AgentMessage from "./AgentMessage";
 import DebateFlowGraph from "./DebateFlowGraph";
+import { PdfExport } from "./PdfExport";
 import { Loader2, List, Network } from "lucide-react";
 import { getAgentByName } from "@/debate/ConversationOrchestrator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -15,9 +17,13 @@ interface Message {
 interface DebateViewerProps {
   conversation: Message[];
   isLoading: boolean;
+  debateResult?: any;
+  papers?: any[];
 }
 
-const DebateViewer = ({ conversation, isLoading }: DebateViewerProps) => {
+const DebateViewer = ({ conversation, isLoading, debateResult, papers = [] }: DebateViewerProps) => {
+  const graphRef = useRef<HTMLDivElement>(null);
+  
   if (conversation.length === 0 && !isLoading) {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -31,12 +37,22 @@ const DebateViewer = ({ conversation, isLoading }: DebateViewerProps) => {
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">Agent Collaboration</h2>
-        {isLoading && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Agents deliberating...
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {conversation.length > 0 && (
+            <PdfExport 
+              conversation={conversation}
+              debateResult={debateResult}
+              papers={papers}
+              graphRef={graphRef}
+            />
+          )}
+          {isLoading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Agents deliberating...
+            </div>
+          )}
+        </div>
       </div>
       
       <Tabs defaultValue="list" className="w-full">
@@ -82,7 +98,9 @@ const DebateViewer = ({ conversation, isLoading }: DebateViewerProps) => {
               Drag to pan, scroll to zoom, and use controls in the bottom-left.
             </p>
           </div>
-          <DebateFlowGraph conversation={conversation} />
+          <div ref={graphRef}>
+            <DebateFlowGraph conversation={conversation} />
+          </div>
         </TabsContent>
       </Tabs>
     </div>

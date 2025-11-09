@@ -6,9 +6,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DebateViewer from "@/components/DebateViewer";
 import InsightReport from "@/components/InsightReport";
 import { PdfUploader } from "@/components/PdfUploader";
+import { ArxivSearch } from "@/components/ArxivSearch";
 import { runDebate, agentsList } from "@/debate/ConversationOrchestrator";
 import { researchPapers } from "@/data/researchPapers";
-import { PlayCircle, Users, FileText, Sparkles } from "lucide-react";
+import { PlayCircle, Users, FileText, Sparkles, Search } from "lucide-react";
 import { toast } from "sonner";
 
 const Index = () => {
@@ -16,13 +17,21 @@ const Index = () => {
   const [debateResult, setDebateResult] = useState<any>(null);
   const [isDebating, setIsDebating] = useState(false);
   const [uploadedPapers, setUploadedPapers] = useState<any[]>([]);
-  const [paperSource, setPaperSource] = useState<"sample" | "uploaded">("sample");
+  const [arxivPapers, setArxivPapers] = useState<any[]>([]);
+  const [paperSource, setPaperSource] = useState<"sample" | "uploaded" | "arxiv">("sample");
   
   const startDebate = async () => {
-    const papers = paperSource === "uploaded" ? uploadedPapers : researchPapers;
+    let papers;
+    if (paperSource === "arxiv") {
+      papers = arxivPapers;
+    } else if (paperSource === "uploaded") {
+      papers = uploadedPapers;
+    } else {
+      papers = researchPapers;
+    }
     
     if (papers.length === 0) {
-      toast.error("Please upload at least one research paper first.");
+      toast.error("Please select or upload at least one research paper first.");
       return;
     }
     
@@ -51,7 +60,14 @@ const Index = () => {
     setPaperSource("uploaded");
   };
 
-  const activePapers = paperSource === "uploaded" ? uploadedPapers : researchPapers;
+  const handleArxivPapersSelected = (papers: any[]) => {
+    setArxivPapers(papers);
+    setPaperSource("arxiv");
+  };
+
+  const activePapers = paperSource === "arxiv" ? arxivPapers : 
+                       paperSource === "uploaded" ? uploadedPapers : 
+                       researchPapers;
   
   // Helper functions to extract structured data from agent sections
   const extractBulletPoints = (sectionText: string | undefined): string[] => {
@@ -167,10 +183,14 @@ const Index = () => {
         
         {/* Paper Source Tabs */}
         {conversation.length === 0 && !isDebating && (
-          <Tabs value={paperSource} onValueChange={(v) => setPaperSource(v as "sample" | "uploaded")} className="mb-8">
-            <TabsList className="grid w-full max-w-md grid-cols-2">
+          <Tabs value={paperSource} onValueChange={(v) => setPaperSource(v as "sample" | "uploaded" | "arxiv")} className="mb-8">
+            <TabsList className="grid w-full max-w-2xl grid-cols-3">
               <TabsTrigger value="sample">Sample Papers</TabsTrigger>
               <TabsTrigger value="uploaded">Upload PDFs</TabsTrigger>
+              <TabsTrigger value="arxiv">
+                <Search className="w-4 h-4 mr-1" />
+                arXiv Search
+              </TabsTrigger>
             </TabsList>
             
             <TabsContent value="sample">
@@ -222,11 +242,50 @@ const Index = () => {
                 </Card>
               )}
             </TabsContent>
+            
+            <TabsContent value="arxiv">
+              <Card className="p-6">
+                <div className="mb-4">
+                  <h3 className="font-semibold text-lg mb-2">Search arXiv Repository</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Search arXiv for research papers on any topic. Select papers to analyze.
+                  </p>
+                </div>
+                <ArxivSearch onPapersSelected={handleArxivPapersSelected} />
+              </Card>
+              {arxivPapers.length > 0 && (
+                <Card className="p-6 bg-gradient-to-br from-primary/5 to-background mt-4">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Search className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg mb-2">Selected arXiv Papers</h3>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {arxivPapers.length} papers ready for agent analysis
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {arxivPapers.map(paper => (
+                          <Badge key={paper.id} variant="outline" className="text-xs">
+                            {paper.title?.substring(0, 50)}...
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+            </TabsContent>
           </Tabs>
         )}
         
         {/* Debate Viewer */}
-        <DebateViewer conversation={conversation} isLoading={isDebating} />
+        <DebateViewer 
+          conversation={conversation} 
+          isLoading={isDebating}
+          debateResult={debateResult}
+          papers={activePapers}
+        />
         
         {/* Insight Report */}
         {!isDebating && transformedSynthesis && transformedValidation && (

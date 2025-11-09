@@ -6,3 +6,6 @@ verify_jwt = false
 
 [functions.agent-respond]
 verify_jwt = false
+
+[functions.arxiv-search]
+verify_jwt = false
