@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 interface Message {
   agent: string;
   content: string;
+  sections?: Record<string, string>;
   turn: number;
   timestamp: string;
   reasoning?: string[];
@@ -40,6 +41,37 @@ const AgentMessage = ({ message, agentColor, agentName, agentRole }: AgentMessag
   };
   
   const getAgentInitial = (agent: string) => agent.charAt(0);
+  
+  const getSectionIcon = (title: string) => {
+    if (title.includes('Pattern') || title.includes('Finding')) return '🔍';
+    if (title.includes('Gap') || title.includes('Missing')) return '⚠️';
+    if (title.includes('Method')) return '🔬';
+    if (title.includes('Question') || title.includes('Concern')) return '❓';
+    if (title.includes('Agreement') || title.includes('Consensus')) return '✅';
+    if (title.includes('Connection') || title.includes('Insight')) return '💡';
+    if (title.includes('Hypothesis') || title.includes('Direction')) return '🎯';
+    if (title.includes('Verified') || title.includes('Confirm')) return '✓';
+    if (title.includes('Confidence')) return '📊';
+    if (title.includes('Citation') || title.includes('Reference')) return '📚';
+    if (title.includes('Uncertainty')) return '🤔';
+    return '📄';
+  };
+  
+  const formatContent = (content: string) => {
+    return content
+      .split('\n')
+      .map(line => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('-') || trimmed.startsWith('*')) {
+          return `<li class="ml-4 mb-1">${trimmed.substring(1).trim()}</li>`;
+        }
+        if (trimmed) {
+          return `<p class="mb-2">${trimmed}</p>`;
+        }
+        return '';
+      })
+      .join('');
+  };
   
   const hasDetails = message.reasoning?.length > 0 || 
                      message.analysis || 
@@ -78,9 +110,29 @@ const AgentMessage = ({ message, agentColor, agentName, agentRole }: AgentMessag
           </div>
           
           {/* Main Content */}
-          <div className="prose prose-sm max-w-none">
-            <p className="text-foreground leading-relaxed">{message.content}</p>
-          </div>
+          {message.sections ? (
+            <div className="space-y-4 mt-4">
+              {Object.entries(message.sections).map(([title, content]) => (
+                <div 
+                  key={title}
+                  className="bg-muted/30 rounded-lg p-4 border border-border/50"
+                >
+                  <h4 className="font-semibold text-sm mb-3 flex items-center gap-2 text-foreground">
+                    <span>{getSectionIcon(title)}</span>
+                    <span>{title}</span>
+                  </h4>
+                  <div 
+                    className="prose prose-sm max-w-none text-foreground/90 leading-relaxed [&_li]:text-foreground/90 [&_p]:text-foreground/90"
+                    dangerouslySetInnerHTML={{ __html: formatContent(content) }}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="prose prose-sm max-w-none">
+              <p className="text-foreground leading-relaxed">{message.content}</p>
+            </div>
+          )}
           
           {/* Special Content Blocks */}
           {message.insight && (
