@@ -5,8 +5,8 @@ import { Upload, FileText, X, Loader2, Play } from "lucide-react";
 import { toast } from "sonner";
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Configure worker - using jsdelivr CDN which is more reliable
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+// Use local worker file from public directory
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 interface ParsedPaper {
   id: number;
