@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Upload, FileText, X, Loader2, Play } from "lucide-react";
 import { toast } from "sonner";
 import * as pdfjsLib from 'pdfjs-dist';
+import { UploadedPaperPreview } from "./UploadedPaperPreview";
 
 // Use local worker file from public directory
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
@@ -153,7 +154,7 @@ export const PdfUploader = ({ onPapersExtracted }: PdfUploaderProps) => {
             year: new Date().getFullYear(),
             source: uploadedFile.name,
             fileName: uploadedFile.name,
-            fullText: analyzedPaper.rawText || text.slice(0, 5000)
+            fullText: text
           };
 
           newPapers.push(paper);
@@ -298,47 +299,10 @@ export const PdfUploader = ({ onPapersExtracted }: PdfUploaderProps) => {
       </Card>
 
       {parsedPapers.length > 0 && (
-        <Card className="p-6">
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold mb-1">Parsed Papers ({parsedPapers.length})</h3>
-            <p className="text-sm text-muted-foreground">
-              Ready for agent analysis
-            </p>
-          </div>
-          <div className="space-y-3">
-            {parsedPapers.map((paper) => (
-              <div
-                key={paper.id}
-                className="p-4 bg-primary/5 rounded-lg border border-primary/20"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <FileText className="w-4 h-4 text-primary flex-shrink-0" />
-                      <p className="text-sm font-semibold truncate">{paper.title}</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
-                      {paper.abstract}
-                    </p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>Source: {paper.fileName}</span>
-                      <span>•</span>
-                      <span>Year: {paper.year}</span>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeParsedPaper(paper.id)}
-                    className="flex-shrink-0"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
+        <UploadedPaperPreview 
+          papers={parsedPapers} 
+          onRemovePaper={removeParsedPaper} 
+        />
       )}
     </div>
   );
