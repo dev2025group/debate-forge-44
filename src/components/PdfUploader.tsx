@@ -5,11 +5,8 @@ import { Upload, FileText, X, Loader2, Play } from "lucide-react";
 import { toast } from "sonner";
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Set worker path for Vite
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.mjs',
-  import.meta.url
-).toString();
+// Configure worker - using jsdelivr CDN which is more reliable
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 interface ParsedPaper {
   id: number;
@@ -42,22 +39,39 @@ export const PdfUploader = ({ onPapersExtracted }: PdfUploaderProps) => {
   const [parsedPapers, setParsedPapers] = useState<ParsedPaper[]>([]);
 
   const extractTextFromPdf = async (file: File): Promise<string> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    
-    let fullText = '';
-    
-    // Extract text from each page
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ');
-      fullText += pageText + '\n';
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      
+      const loadingTask = pdfjsLib.getDocument({
+        data: arrayBuffer,
+        useWorkerFetch: false,
+        isEvalSupported: false,
+        useSystemFonts: true,
+      });
+      
+      const pdf = await loadingTask.promise;
+      
+      let fullText = '';
+      
+      // Extract text from each page (limit to first 10 pages to avoid timeout)
+      const maxPages = Math.min(pdf.numPages, 10);
+      console.log(`Extracting text from ${maxPages} pages of ${file.name}`);
+      
+      for (let i = 1; i <= maxPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ');
+        fullText += pageText + '\n';
+      }
+      
+      console.log(`Successfully extracted ${fullText.length} characters from ${file.name}`);
+      return fullText;
+    } catch (error) {
+      console.error(`PDF extraction error for ${file.name}:`, error);
+      throw new Error(`Failed to extract text: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-    
-    return fullText;
   };
 
   const extractPaperData = (text: string, fileName: string, paperId: number): ParsedPaper => {
@@ -178,10 +192,17 @@ export const PdfUploader = ({ onPapersExtracted }: PdfUploaderProps) => {
         toast.info(`Parsing ${i + 1}/${uploadedFiles.length}: ${uploadedFile.name}`);
 
         try {
+          console.log(`Starting to parse: ${uploadedFile.name}`);
           const text = await extractTextFromPdf(uploadedFile.file);
+          
+          if (!text || text.trim().length === 0) {
+            throw new Error("No text could be extracted from PDF");
+          }
+          
           const paper = extractPaperData(text, uploadedFile.name, parsedPapers.length + i + 1);
           newPapers.push(paper);
           
+          console.log(`Successfully parsed: ${uploadedFile.name}`);
           toast.success(`✓ Extracted: ${uploadedFile.name}`);
           
           // Small delay between files to show progress
@@ -189,7 +210,8 @@ export const PdfUploader = ({ onPapersExtracted }: PdfUploaderProps) => {
           
         } catch (error) {
           console.error(`Error parsing ${uploadedFile.name}:`, error);
-          toast.error(`Failed to parse ${uploadedFile.name}`);
+          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+          toast.error(`Failed to parse ${uploadedFile.name}: ${errorMsg}`);
         }
       }
 
