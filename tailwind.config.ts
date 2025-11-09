@@ -57,6 +57,26 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        researcher: {
+          DEFAULT: "hsl(var(--researcher))",
+          bg: "hsl(var(--researcher-bg))",
+          border: "hsl(var(--researcher-border))",
+        },
+        critic: {
+          DEFAULT: "hsl(var(--critic))",
+          bg: "hsl(var(--critic-bg))",
+          border: "hsl(var(--critic-border))",
+        },
+        synthesizer: {
+          DEFAULT: "hsl(var(--synthesizer))",
+          bg: "hsl(var(--synthesizer-bg))",
+          border: "hsl(var(--synthesizer-border))",
+        },
+        validator: {
+          DEFAULT: "hsl(var(--validator))",
+          bg: "hsl(var(--validator-bg))",
+          border: "hsl(var(--validator-border))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

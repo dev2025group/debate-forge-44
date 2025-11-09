@@ -1,0 +1,171 @@
+import { useState } from "react";
+import { ChevronDown, ChevronUp, User } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+interface Message {
+  agent: string;
+  content: string;
+  turn: number;
+  timestamp: string;
+  reasoning?: string[];
+  analysis?: any;
+  challenges?: string[];
+  questions?: string[];
+  insight?: string;
+  citations?: any[];
+  [key: string]: any;
+}
+
+interface AgentMessageProps {
+  message: Message;
+  agentColor: string;
+  agentName: string;
+  agentRole: string;
+}
+
+const AgentMessage = ({ message, agentColor, agentName, agentRole }: AgentMessageProps) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const getAgentColorClass = (agent: string) => {
+    switch (agent) {
+      case "Researcher": return "border-researcher bg-researcher-bg";
+      case "Critic": return "border-critic bg-critic-bg";
+      case "Synthesizer": return "border-synthesizer bg-synthesizer-bg";
+      case "Validator": return "border-validator bg-validator-bg";
+      default: return "border-border bg-card";
+    }
+  };
+  
+  const getAgentInitial = (agent: string) => agent.charAt(0);
+  
+  const hasDetails = message.reasoning?.length > 0 || 
+                     message.analysis || 
+                     message.challenges?.length > 0 ||
+                     message.questions?.length > 0 ||
+                     message.citations?.length > 0;
+  
+  return (
+    <Card className={cn(
+      "p-6 border-l-4 animate-in fade-in slide-in-from-bottom-4 duration-500",
+      getAgentColorClass(message.agent)
+    )}>
+      <div className="flex gap-4">
+        {/* Agent Avatar */}
+        <div 
+          className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
+          style={{ backgroundColor: agentColor }}
+        >
+          {getAgentInitial(message.agent)}
+        </div>
+        
+        <div className="flex-1 space-y-3">
+          {/* Agent Header */}
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-lg">{agentName}</h3>
+                <Badge variant="secondary" className="text-xs">
+                  {agentRole}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Turn {message.turn} • {new Date(message.timestamp).toLocaleTimeString()}
+              </p>
+            </div>
+          </div>
+          
+          {/* Main Content */}
+          <div className="prose prose-sm max-w-none">
+            <p className="text-foreground leading-relaxed">{message.content}</p>
+          </div>
+          
+          {/* Special Content Blocks */}
+          {message.insight && (
+            <div className="bg-synthesizer-bg border border-synthesizer-border rounded-lg p-4 mt-4">
+              <p className="text-sm font-medium text-synthesizer mb-2">💡 Collective Insight</p>
+              <p className="text-sm text-foreground">{message.insight}</p>
+            </div>
+          )}
+          
+          {message.challenges && message.challenges.length > 0 && (
+            <div className="bg-critic-bg border border-critic-border rounded-lg p-4 mt-4">
+              <p className="text-sm font-medium text-critic mb-2">⚠️ Challenges Raised</p>
+              <ul className="text-sm space-y-1 list-disc list-inside">
+                {message.challenges.slice(0, 2).map((challenge: string, idx: number) => (
+                  <li key={idx} className="text-foreground">{challenge}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
+          {/* Expandable Details */}
+          {hasDetails && (
+            <div className="mt-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="text-xs"
+              >
+                {isExpanded ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
+                {isExpanded ? "Hide" : "Show"} Details
+              </Button>
+              
+              {isExpanded && (
+                <div className="mt-3 space-y-3 text-sm bg-muted/50 rounded-lg p-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                  {message.reasoning && message.reasoning.length > 0 && (
+                    <div>
+                      <p className="font-medium mb-2">Reasoning Steps:</p>
+                      <ul className="space-y-1 list-disc list-inside text-muted-foreground">
+                        {message.reasoning.map((step: string, idx: number) => (
+                          <li key={idx}>{step}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {message.questions && message.questions.length > 0 && (
+                    <div>
+                      <p className="font-medium mb-2">Questions for Discussion:</p>
+                      <ul className="space-y-1 list-disc list-inside text-muted-foreground">
+                        {message.questions.map((q: string, idx: number) => (
+                          <li key={idx}>{q}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {message.citations && message.citations.length > 0 && (
+                    <div>
+                      <p className="font-medium mb-2">Citations:</p>
+                      <div className="space-y-2">
+                        {message.citations.map((citation: any, idx: number) => (
+                          <div key={idx} className="bg-background rounded p-2">
+                            <p className="text-xs font-medium">Paper {citation.paperId}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{citation.relevantFinding}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {message.references && message.references.length > 0 && (
+                    <div>
+                      <p className="font-medium mb-2">References:</p>
+                      <p className="text-muted-foreground">Papers {message.references.join(", ")}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+};
+
+export default AgentMessage;
