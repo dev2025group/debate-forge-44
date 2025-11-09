@@ -33,7 +33,7 @@ const Index = () => {
     toast.info("Debate started! Agents are analyzing research papers...");
     
     const result = await runDebate(papers, (updatedConversation) => {
-      setConversation(updatedConversation);
+      setConversation([...updatedConversation]);
     });
     
     setDebateResult(result);

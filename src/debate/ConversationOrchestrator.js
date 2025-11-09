@@ -60,11 +60,6 @@ export const runDebate = async (papers, onUpdate) => {
     // Run the debate
     for (let i = 0; i < debateSequence.length; i++) {
       const { agent, description } = debateSequence[i];
-      
-      onUpdate?.({
-        message: `${agent} ${description}...`,
-        progress: ((i + 1) / debateSequence.length) * 100
-      });
 
       // Call the agent-respond edge function
       const { data, error } = await supabase.functions.invoke('agent-respond', {
