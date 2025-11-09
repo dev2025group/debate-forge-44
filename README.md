@@ -1,73 +1,196 @@
-# Welcome to your Lovable project
 
-## Project info
+```markdown
+# 🧠 Multi-Agent Research Debate System
 
-**URL**: https://lovable.dev/projects/ce0672cc-c596-4cea-9966-fc2a243e113a
+> AI agents that collaborate, debate, and reason together to analyze research papers
 
-## How can I edit this code?
+**Hackathon Challenge**: Can AI agents reason and collaborate to uncover something new?
 
-There are several ways of editing your application.
+## 🎯 What It Does
 
-**Use Lovable**
+This system simulates a research lab where four specialized AI agents analyze scientific papers through structured debate. Instead of just summarizing, they challenge each other's findings, connect patterns across papers, and verify claims against source material—producing transparent, evidence-based insights.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/ce0672cc-c596-4cea-9966-fc2a243e113a) and start prompting.
+**Live Demo**: [Your deployed URL]
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🤖 Meet The Agents
 
-**Use your preferred IDE**
+- **🧠 Dr. Research (Researcher)** - Extracts key findings and summarizes papers
+- **🔴 Dr. Critical (Critic)** - Challenges assumptions, identifies flaws, determines when analysis is complete
+- **🟢 Dr. Synthesis (Synthesizer)** - Connects patterns and builds unified insights
+- **🟣 Dr. Verify (Validator)** - Cross-checks claims against source papers
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## ✨ Key Features
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### 📄 Paper Input (3 Ways)
+- Upload your own PDFs
+- Search arXiv database directly
+- Try with sample papers
 
-Follow these steps:
+### 🎭 Multi-Agent Debate
+- Agents debate in real-time until the Critic is satisfied
+- Each claim is backed by evidence citations
+- Dynamic debate length based on paper complexity
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### 📊 Visual Debate Flow
+- Interactive graph showing conversation flow
+- Color-coded agent messages
+- Track reasoning patterns
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 📑 Export Results
+- Generate PDF reports with insights
+- Includes debate visualization
+- Confidence scores for each finding
 
-# Step 3: Install the necessary dependencies.
-npm i
+## 🛠️ Technologies Used
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **Platform** | Lovable AI | Full-stack development and AI orchestration |
+| **Frontend** | React 18 + TypeScript | Component-based UI |
+| **Styling** | Tailwind CSS + shadcn-ui | Responsive design system |
+| **AI** | Google Gemini 2.5 Flash | Powers all 4 agents |
+| **Backend** | Lovable Cloud (Supabase) | Serverless edge functions |
+| **PDF Processing** | pdfjs-dist | Extract text from papers |
+| **Visualization** | React Flow | Interactive debate graphs |
+| **Export** | jsPDF + html-to-image | PDF report generation |
+
+## 🚀 How It Works
+
+```
+1. Upload Paper(s) → 2. Auto-Parse Sections → 3. Multi-Agent Debate
+                                                        ↓
+                      6. Export PDF ← 5. Display Insights ← 4. Critic Validates
+```
+
+### The Debate Process
+
+1. **Dr. Research** analyzes the paper and presents initial findings
+2. **Dr. Critical** challenges the analysis, asks for deeper investigation
+3. **Dr. Research** refines based on feedback (iterates until Critic approves)
+4. **Dr. Synthesis** connects patterns and builds collective insights
+5. **Dr. Verify** validates claims against source material
+
+## 💪 Challenges We Solved
+
+### 1. **Inconsistent AI Responses**
+**Problem**: AI generated sections in different formats (bolding, capitalization, missing labels)
+
+**Solution**: Implemented flexible pattern-matching using regular expressions to extract structured data regardless of formatting variations
+```javascript
+// Looks for multiple variations: **Abstract:**, Abstract:, ABSTRACT:, etc.
+const abstractMatch = text.match(/\*\*Abstract:\*\*|\bAbstract:|\bABSTRACT:/i);
+```
+
+### 2. **Knowing When to Stop the Debate**
+**Problem**: How many back-and-forth rounds are enough?
+
+**Solution**: Gave the Critic agent special authority to signal completion by using phrases like "This analysis is now comprehensive" in its response
+
+### 3. **PDF Text Extraction**
+**Problem**: PDFs have complex layouts that don't extract cleanly
+
+**Solution**: Used `pdfjs-dist` library with section parsing logic to identify Introduction, Methodology, Results, and Discussion sections
+
+### 4. **Real-Time Visualization**
+**Problem**: Making the invisible debate process visible
+
+**Solution**: React Flow library to create interactive node-based graphs showing agent messages and conversation flow
+
+## 🎓 What We Learned
+
+- Getting AI agents to behave **consistently** is harder than making them smart
+- Pattern-matching is essential when working with dynamic AI responses
+- Clear agent roles and stopping conditions prevent endless debates
+- Streaming responses create better user experience than waiting for full completion
+
+## 🔮 Future Improvements
+
+- [ ] Save debate history to database
+- [ ] Support longer papers with smart chunking
+- [ ] Add more specialized agents (e.g., Statistician, Ethicist)
+- [ ] Better error handling for malformed PDFs
+- [ ] Allow users to ask follow-up questions to agents
+
+## 🏃 Quick Start
+
+### Prerequisites
+- Node.js 16+ and npm
+
+### Installation
+
+```bash
+# Clone the repository
+git clone 
+
+# Navigate to project
+cd research-debate-system
+
+# Install dependencies
+npm install
+
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Visit `http://localhost:8080` to see the app in action!
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 📦 Project Structure
 
-**Use GitHub Codespaces**
+```
+src/
+├── agents/               # Agent personality definitions
+│   ├── ResearcherAgent.js
+│   ├── CriticAgent.js
+│   ├── SynthesizerAgent.js
+│   └── ValidatorAgent.js
+├── debate/
+│   └── ConversationOrchestrator.js  # Debate flow logic
+├── components/
+│   ├── DebateViewer.tsx             # Real-time debate display
+│   ├── DebateFlowGraph.tsx          # Visual graph
+│   ├── InsightReport.tsx            # Final results
+│   └── PdfUploader.tsx              # Paper input
+└── pages/
+    └── Index.tsx                    # Main app page
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+supabase/functions/
+└── agent-respond/        # Edge function for AI processing
+```
 
-## What technologies are used for this project?
+## 🏆 Built For
 
-This project is built with:
+**AI Hackathon Challenge**: Multi-agent reasoning and collaboration
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+**Built in**: 48 hours
 
-## How can I deploy this project?
+**Team Size**: [Solo / Team of X]
 
-Simply open [Lovable](https://lovable.dev/projects/ce0672cc-c596-4cea-9966-fc2a243e113a) and click on Share -> Publish.
+## 📄 License
 
-## Can I connect a custom domain to my Lovable project?
+MIT License - Feel free to use and adapt!
 
-Yes, you can!
+## 🙏 Acknowledgments
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- Lovable AI for rapid full-stack development
+- Google Gemini for powering agent intelligence
+- The open-source community for amazing libraries
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+---
+
+**Made with ❤️ using Lovable**
+```
+
+---
+
+This README covers:
+- ✅ **What** your project does (clear value proposition)
+- ✅ **How** it works (architecture + flow)
+- ✅ **Why** it's impressive (challenges solved)
+- ✅ **Technologies** used (with purpose for each)
+- ✅ **Instructions** to run it
+- ✅ **Future vision** (shows thoughtfulness)
+
+It's written to be accessible to non-technical judges while showing technical depth to developer judges. Would you like me to adjust any section?
+
+Add Visual Documentation
+Add Contributing Guidelines
