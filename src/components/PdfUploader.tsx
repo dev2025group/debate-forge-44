@@ -53,11 +53,10 @@ export const PdfUploader = ({ onPapersExtracted }: PdfUploaderProps) => {
       
       let fullText = '';
       
-      // Extract text from each page (limit to first 10 pages to avoid timeout)
-      const maxPages = Math.min(pdf.numPages, 10);
-      console.log(`Extracting text from ${maxPages} pages of ${file.name}`);
+      // Extract text from all pages
+      console.log(`Extracting text from ${pdf.numPages} pages of ${file.name}`);
       
-      for (let i = 1; i <= maxPages; i++) {
+      for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
         const pageText = textContent.items
@@ -72,87 +71,6 @@ export const PdfUploader = ({ onPapersExtracted }: PdfUploaderProps) => {
       console.error(`PDF extraction error for ${file.name}:`, error);
       throw new Error(`Failed to extract text: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  };
-
-  const extractPaperData = (text: string, fileName: string, paperId: number): ParsedPaper => {
-    const lines = text.split('\n').filter(line => line.trim().length > 0);
-    const fullText = text.toLowerCase();
-    
-    // Extract title (usually near the start, capitalized, longer line)
-    const titleCandidates = lines.slice(0, 10).filter(line => 
-      line.length > 20 && line.length < 200 && /[A-Z]/.test(line)
-    );
-    const title = titleCandidates[0] || fileName.replace('.pdf', '');
-    
-    // Find abstract
-    const abstractStart = lines.findIndex(line => 
-      /abstract|summary/i.test(line)
-    );
-    const abstract = abstractStart >= 0 
-      ? lines.slice(abstractStart + 1, abstractStart + 6)
-          .join(' ')
-          .slice(0, 400)
-          .trim()
-      : lines.slice(0, 5).join(' ').slice(0, 400).trim();
-    
-    // Find results/findings
-    const resultsStart = lines.findIndex(line => 
-      /^results?$|^findings?$|^outcomes?$/i.test(line.trim())
-    );
-    const results = resultsStart >= 0
-      ? lines.slice(resultsStart + 1, resultsStart + 5)
-          .join(' ')
-          .slice(0, 300)
-          .trim()
-      : "Results section not clearly identified";
-    
-    // Find methodology
-    const methodStart = lines.findIndex(line => 
-      /^method|^methodology|^approach|^experimental/i.test(line.trim())
-    );
-    const methodology = methodStart >= 0
-      ? lines.slice(methodStart + 1, methodStart + 4)
-          .join(' ')
-          .slice(0, 300)
-          .trim()
-      : "Methodology section not clearly identified";
-    
-    // Find limitations
-    const limitStart = lines.findIndex(line => 
-      /limitation|constraint|challenge|future work/i.test(line)
-    );
-    const limitations = limitStart >= 0
-      ? lines.slice(limitStart + 1, limitStart + 4)
-          .join(' ')
-          .slice(0, 250)
-          .trim()
-      : "Limitations not explicitly stated";
-    
-    // Extract key findings (look for numbered points, percentages, or conclusion statements)
-    const findingsLines = lines.filter(line => 
-      /\d+%|\d+\.\d+|conclude|demonstrate|show that|found that|achieve/i.test(line)
-    ).slice(0, 4);
-    const keyFindings = findingsLines.length > 0
-      ? findingsLines.join(' ').slice(0, 350).trim()
-      : "Key findings extracted from full text";
-    
-    // Try to extract year
-    const yearMatch = text.match(/\b(20\d{2})\b/);
-    const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
-    
-    return {
-      id: paperId,
-      title,
-      abstract,
-      keyFindings,
-      methodology,
-      results,
-      limitations,
-      year,
-      source: fileName,
-      fileName,
-      fullText: text.slice(0, 5000) // Store first 5000 chars for agent analysis
-    };
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -185,6 +103,9 @@ export const PdfUploader = ({ onPapersExtracted }: PdfUploaderProps) => {
     const newPapers: ParsedPaper[] = [];
 
     try {
+      // Dynamic import to avoid circular dependency
+      const { supabase } = await import("@/integrations/supabase/client");
+
       for (let i = 0; i < uploadedFiles.length; i++) {
         const uploadedFile = uploadedFiles[i];
         setCurrentParsing(uploadedFile.name);
@@ -192,6 +113,7 @@ export const PdfUploader = ({ onPapersExtracted }: PdfUploaderProps) => {
         toast.info(`Parsing ${i + 1}/${uploadedFiles.length}: ${uploadedFile.name}`);
 
         try {
+          // Step 1: Extract text from PDF
           console.log(`Starting to parse: ${uploadedFile.name}`);
           const text = await extractTextFromPdf(uploadedFile.file);
           
@@ -199,14 +121,48 @@ export const PdfUploader = ({ onPapersExtracted }: PdfUploaderProps) => {
             throw new Error("No text could be extracted from PDF");
           }
           
-          const paper = extractPaperData(text, uploadedFile.name, parsedPapers.length + i + 1);
+          console.log(`Extracted ${text.length} characters, now analyzing with AI...`);
+          toast.info(`Analyzing ${uploadedFile.name} with AI...`);
+
+          // Step 2: Analyze with AI
+          const { data: analyzedPaper, error } = await supabase.functions.invoke('analyze-paper', {
+            body: { 
+              text: text,
+              filename: uploadedFile.name 
+            }
+          });
+
+          if (error) {
+            console.error(`AI analysis error for ${uploadedFile.name}:`, error);
+            throw new Error(`AI analysis failed: ${error.message}`);
+          }
+
+          if (!analyzedPaper) {
+            throw new Error("No data returned from AI analysis");
+          }
+
+          // Convert AI response to ParsedPaper format
+          const paper: ParsedPaper = {
+            id: parsedPapers.length + i + 1,
+            title: analyzedPaper.title || uploadedFile.name.replace('.pdf', ''),
+            abstract: analyzedPaper.abstract || 'No abstract extracted',
+            keyFindings: analyzedPaper.keyFindings || 'No key findings extracted',
+            methodology: analyzedPaper.methodology || 'No methodology extracted',
+            results: analyzedPaper.results || 'No results extracted',
+            limitations: analyzedPaper.limitations || 'No limitations extracted',
+            year: new Date().getFullYear(),
+            source: uploadedFile.name,
+            fileName: uploadedFile.name,
+            fullText: analyzedPaper.rawText || text.slice(0, 5000)
+          };
+
           newPapers.push(paper);
           
-          console.log(`Successfully parsed: ${uploadedFile.name}`);
-          toast.success(`✓ Extracted: ${uploadedFile.name}`);
+          console.log(`Successfully analyzed: ${uploadedFile.name}`);
+          toast.success(`✓ Analyzed: ${uploadedFile.name}`);
           
           // Small delay between files to show progress
-          await new Promise(resolve => setTimeout(resolve, 800));
+          await new Promise(resolve => setTimeout(resolve, 500));
           
         } catch (error) {
           console.error(`Error parsing ${uploadedFile.name}:`, error);
@@ -219,7 +175,7 @@ export const PdfUploader = ({ onPapersExtracted }: PdfUploaderProps) => {
         const updatedPapers = [...parsedPapers, ...newPapers];
         setParsedPapers(updatedPapers);
         onPapersExtracted(updatedPapers);
-        toast.success(`Successfully parsed ${newPapers.length} paper(s)!`);
+        toast.success(`Successfully analyzed ${newPapers.length} paper(s) with AI!`);
         
         // Clear uploaded files after successful parsing
         setUploadedFiles([]);
@@ -247,7 +203,7 @@ export const PdfUploader = ({ onPapersExtracted }: PdfUploaderProps) => {
           <div>
             <h3 className="text-lg font-semibold mb-1">Upload Research Papers</h3>
             <p className="text-sm text-muted-foreground">
-              Step 1: Upload PDF files (2-3 pages recommended for best results)
+              Upload PDFs to extract and analyze with AI
             </p>
           </div>
           <label htmlFor="pdf-upload">
@@ -279,17 +235,17 @@ export const PdfUploader = ({ onPapersExtracted }: PdfUploaderProps) => {
                 size="sm"
                 className="gap-2"
               >
-                {parsing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Parsing...
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4" />
-                    Parse All PDFs
-                  </>
-                )}
+                  {parsing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Analyzing with AI...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4" />
+                      Analyze with AI
+                    </>
+                  )}
               </Button>
             </div>
 

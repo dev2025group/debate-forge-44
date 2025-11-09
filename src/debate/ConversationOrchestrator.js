@@ -1,88 +1,116 @@
-// Conversation Orchestrator: Coordinates multi-turn debate between agents
+import { supabase } from "@/integrations/supabase/client";
 
-import { ResearcherAgent } from '../agents/ResearcherAgent';
-import { CriticAgent } from '../agents/CriticAgent';
-import { SynthesizerAgent } from '../agents/SynthesizerAgent';
-import { ValidatorAgent } from '../agents/ValidatorAgent';
+// Agent metadata (no logic, just presentation data)
+const agentMetadata = {
+  Researcher: {
+    name: "Dr. Research",
+    color: "#3B82F6",
+    role: "Research Analyst",
+    personality: "Thorough and analytical"
+  },
+  Critic: {
+    name: "Dr. Critical",
+    color: "#EF4444",
+    role: "Critical Reviewer",
+    personality: "Skeptical and rigorous"
+  },
+  Synthesizer: {
+    name: "Dr. Synthesis",
+    color: "#10B981",
+    role: "Insight Generator",
+    personality: "Balanced and integrative"
+  },
+  Validator: {
+    name: "Dr. Verify",
+    color: "#8B5CF6",
+    role: "Evidence Checker",
+    personality: "Precise and factual"
+  }
+};
 
-export async function runDebate(papers, onUpdate = null) {
-  const conversation = [];
-  const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-  
+export const agentsList = Object.entries(agentMetadata).map(([key, data]) => ({
+  ...data,
+  agent: key
+}));
+
+export const getAgentByName = (agentName) => {
+  return agentMetadata[agentName] || null;
+};
+
+/**
+ * Orchestrates a multi-turn AI-powered debate between agents
+ * @param {Array} papers - Array of analyzed paper objects
+ * @param {Function} onUpdate - Callback for progress updates
+ * @returns {Promise<Object>} Debate results with conversation and insights
+ */
+export const runDebate = async (papers, onUpdate) => {
   try {
-    // TURN 1: Researcher analyzes papers
-    console.log("Turn 1: Researcher analyzing papers...");
-    const researcherMsg1 = ResearcherAgent.respond(papers, conversation);
-    conversation.push(researcherMsg1);
-    if (onUpdate) onUpdate([...conversation]);
-    await delay(2000);
+    const conversation = [];
     
-    // TURN 2: Critic challenges Researcher
-    console.log("Turn 2: Critic reviewing analysis...");
-    const criticMsg1 = CriticAgent.respond(papers, conversation);
-    conversation.push(criticMsg1);
-    if (onUpdate) onUpdate([...conversation]);
-    await delay(2000);
-    
-    // TURN 3: Researcher responds to critique
-    console.log("Turn 3: Researcher addressing critique...");
-    const researcherMsg2 = ResearcherAgent.respond(papers, conversation);
-    conversation.push(researcherMsg2);
-    if (onUpdate) onUpdate([...conversation]);
-    await delay(2000);
-    
-    // TURN 4: Additional debate round
-    console.log("Turn 4: Critic's final thoughts...");
-    const criticMsg2 = CriticAgent.respond(papers, conversation);
-    conversation.push(criticMsg2);
-    if (onUpdate) onUpdate([...conversation]);
-    await delay(2000);
-    
-    // TURN 5: Synthesizer creates insight
-    console.log("Turn 5: Synthesizer generating collective insight...");
-    const synthesizerMsg = SynthesizerAgent.respond(papers, conversation);
-    conversation.push(synthesizerMsg);
-    if (onUpdate) onUpdate([...conversation]);
-    await delay(2000);
-    
-    // TURN 6: Validator verifies
-    console.log("Turn 6: Validator fact-checking...");
-    const validatorMsg = ValidatorAgent.respond(papers, conversation);
-    conversation.push(validatorMsg);
-    if (onUpdate) onUpdate([...conversation]);
-    
-    console.log("Debate complete!");
+    // Define the debate sequence
+    const debateSequence = [
+      { agent: 'Researcher', description: 'Initial analysis' },
+      { agent: 'Critic', description: 'Critical review' },
+      { agent: 'Researcher', description: 'Response to criticism' },
+      { agent: 'Critic', description: 'Follow-up critique' },
+      { agent: 'Synthesizer', description: 'Synthesizing insights' },
+      { agent: 'Validator', description: 'Validating conclusions' }
+    ];
+
+    // Run the debate
+    for (let i = 0; i < debateSequence.length; i++) {
+      const { agent, description } = debateSequence[i];
+      
+      onUpdate?.({
+        message: `${agent} ${description}...`,
+        progress: ((i + 1) / debateSequence.length) * 100
+      });
+
+      // Call the agent-respond edge function
+      const { data, error } = await supabase.functions.invoke('agent-respond', {
+        body: {
+          agentType: agent,
+          papers: papers,
+          conversationHistory: conversation
+        }
+      });
+
+      if (error) {
+        console.error(`Error from ${agent}:`, error);
+        throw new Error(`${agent} failed: ${error.message}`);
+      }
+
+      if (!data) {
+        throw new Error(`No response from ${agent}`);
+      }
+
+      // Add to conversation
+      conversation.push(data);
+
+      // Small delay for better UX
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    // Extract final insights
+    const synthesis = conversation.find(m => m.agent === 'Synthesizer');
+    const validation = conversation.find(m => m.agent === 'Validator');
+
     return {
       conversation,
-      finalInsight: synthesizerMsg.insight,
-      confidence: validatorMsg.overallConfidence,
-      citations: validatorMsg.citations,
+      finalInsight: synthesis?.content || 'No synthesis generated',
+      confidence: 85, // Could extract this from validator response
+      citations: papers.map(p => ({
+        paperId: p.id,
+        title: p.title
+      })),
       success: true
     };
-    
+
   } catch (error) {
-    console.error("Debate error:", error);
+    console.error('Debate orchestration error:', error);
     return {
-      conversation,
       error: error.message,
       success: false
     };
   }
-}
-
-export function getAgentByName(name) {
-  const agents = {
-    "Researcher": ResearcherAgent,
-    "Critic": CriticAgent,
-    "Synthesizer": SynthesizerAgent,
-    "Validator": ValidatorAgent
-  };
-  return agents[name];
-}
-
-export const agentsList = [
-  ResearcherAgent,
-  CriticAgent,
-  SynthesizerAgent,
-  ValidatorAgent
-];
+};

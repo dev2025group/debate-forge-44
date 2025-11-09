@@ -1,0 +1,8 @@
+[project]
+project_id = "eztslvsiwiwnocsrlyoc"
+
+[functions.analyze-paper]
+verify_jwt = false
+
+[functions.agent-respond]
+verify_jwt = false
