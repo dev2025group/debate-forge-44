@@ -7,9 +7,10 @@ import { Download, CheckCircle2, Lightbulb, FileText } from "lucide-react";
 interface InsightReportProps {
   synthesis: any;
   validation: any;
+  papers: any[];
 }
 
-const InsightReport = ({ synthesis, validation }: InsightReportProps) => {
+const InsightReport = ({ synthesis, validation, papers }: InsightReportProps) => {
   if (!synthesis || !validation) return null;
   
   const handleDownload = () => {
@@ -19,7 +20,19 @@ const InsightReport = ({ synthesis, validation }: InsightReportProps) => {
       consensusPoints: synthesis.consensusPoints,
       hypothesis: synthesis.hypothesis,
       citations: validation.citations,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      // Include full paper texts
+      sourcePapers: papers.map(p => ({
+        id: p.id,
+        title: p.title,
+        fileName: p.fileName || p.source,
+        abstract: p.abstract,
+        methodology: p.methodology,
+        keyFindings: p.keyFindings,
+        results: p.results,
+        limitations: p.limitations,
+        fullText: p.fullText || p.rawText || "Text not available"
+      }))
     };
     
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });

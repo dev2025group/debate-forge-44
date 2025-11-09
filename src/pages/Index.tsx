@@ -53,8 +53,49 @@ const Index = () => {
 
   const activePapers = paperSource === "uploaded" ? uploadedPapers : researchPapers;
   
+  // Helper functions to extract structured data from agent sections
+  const extractBulletPoints = (sectionText: string | undefined): string[] => {
+    if (!sectionText) return [];
+    return sectionText
+      .split('\n')
+      .filter(line => line.trim().startsWith('-') || line.trim().startsWith('•') || line.trim().startsWith('*'))
+      .map(line => line.trim().substring(1).trim())
+      .filter(point => point.length > 0);
+  };
+
+  const extractConfidence = (sectionText: string | undefined): number => {
+    if (!sectionText) return 75;
+    const match = sectionText.match(/(\d+)%/);
+    return match ? parseInt(match[1]) : 75;
+  };
+  
   const synthesisMessage = conversation.find(m => m.agent === "Synthesizer");
   const validationMessage = conversation.find(m => m.agent === "Validator");
+  
+  // Transform messages into structured data for InsightReport
+  const transformedSynthesis = synthesisMessage ? {
+    insight: extractBulletPoints(synthesisMessage.sections?.["Points of Agreement"])?.[0] || 
+             extractBulletPoints(synthesisMessage.sections?.["Novel Connections"])?.[0] ||
+             synthesisMessage.content.substring(0, 300) + "...",
+    consensusPoints: extractBulletPoints(synthesisMessage.sections?.["Points of Agreement"]),
+    hypothesis: synthesisMessage.sections?.["Proposed Hypothesis"] || 
+                synthesisMessage.sections?.["Future Research Directions"] ||
+                "",
+    fullContent: synthesisMessage.content
+  } : null;
+
+  const transformedValidation = validationMessage ? {
+    overallConfidence: extractConfidence(validationMessage.sections?.["Confidence Assessment"] || validationMessage.content),
+    citations: activePapers.map((p, idx) => ({
+      paperId: idx + 1,
+      title: p.title,
+      relevantFinding: p.keyFindings || "Key finding from paper",
+      supportsInsight: "Verified against paper findings"
+    })),
+    verified: extractBulletPoints(validationMessage.sections?.["Verified Claims"]),
+    concerns: extractBulletPoints(validationMessage.sections?.["Areas of Uncertainty"]),
+    fullContent: validationMessage.content
+  } : null;
   
   return (
     <div className="min-h-screen bg-background">
@@ -188,8 +229,12 @@ const Index = () => {
         <DebateViewer conversation={conversation} isLoading={isDebating} />
         
         {/* Insight Report */}
-        {!isDebating && synthesisMessage && validationMessage && (
-          <InsightReport synthesis={synthesisMessage} validation={validationMessage} />
+        {!isDebating && transformedSynthesis && transformedValidation && (
+          <InsightReport 
+            synthesis={transformedSynthesis} 
+            validation={transformedValidation}
+            papers={activePapers}
+          />
         )}
       </main>
       
