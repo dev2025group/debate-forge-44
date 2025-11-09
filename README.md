@@ -3,7 +3,7 @@
 
 > AI agents that collaborate, debate, and reason together to analyze research papers
 
-**Hackathon Challenge**: Multi-agent reasoning and collaboration in research.
+**Hackathon Challenge (Hack-Nation.ai)**: Multi-agent reasoning and collaboration in research.
 
 ---
 
