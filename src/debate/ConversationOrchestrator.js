@@ -87,6 +87,9 @@ export const runDebate = async (papers, onUpdate) => {
       // Add to conversation
       conversation.push(data);
 
+      // Update the conversation in real-time
+      onUpdate?.(conversation);
+
       // Small delay for better UX
       await new Promise(resolve => setTimeout(resolve, 500));
     }
