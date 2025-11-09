@@ -11,7 +11,7 @@
 
 This system simulates a research lab where multiple AI agents analyze scientific papers through structured debate. Instead of just summarizing, agents challenge each other's findings, connect patterns across papers, and verify claims against source material—producing transparent, evidence-based insights.
 
-**Live Demo**: [Insert Your Deployed URL Here]
+**Live Demo**: https://debate-forge-44.lovable.app/
 
 ---
 
@@ -163,8 +163,8 @@ supabase/functions/
 ## 🏆 Built For
 
 **Hackathon Challenge:** Multi-agent reasoning and collaboration
-**Built in:** 48 hours
-**Team Size:** [Solo / Team of X]
+**Built in:** 24 hours
+**Team Size:** [Solo]
 
 ---
 
@@ -183,6 +183,3 @@ MIT License – Feel free to use and adapt
 ---
 
 **Made with ❤️ using Lovable**
-
-```
-
