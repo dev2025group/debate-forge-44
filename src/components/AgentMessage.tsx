@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, User } from "lucide-react";
+import { ChevronDown, ChevronUp, User, Brain } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -133,21 +133,38 @@ const AgentMessage = ({ message, agentColor, agentName, agentRole }: AgentMessag
           {/* Main Content */}
           {message.sections ? (
             <div className="space-y-4 mt-4">
-              {Object.entries(message.sections).map(([title, content]) => (
-                <div 
-                  key={title}
-                  className="bg-muted/30 rounded-lg p-4 border border-border/50"
-                >
-                  <h4 className="font-semibold text-sm mb-3 flex items-center gap-2 text-foreground">
-                    <span>{getSectionIcon(title)}</span>
-                    <span>{title}</span>
+              {/* Reasoning Section - Highlighted */}
+              {message.sections["Reasoning"] && (
+                <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-background rounded-lg p-5 border-2 border-primary/30 shadow-sm">
+                  <h4 className="font-semibold text-base mb-3 flex items-center gap-2 text-primary">
+                    <Brain className="w-5 h-5" />
+                    <span>Step-by-Step Reasoning</span>
                   </h4>
                   <div 
-                    className="prose prose-sm max-w-none text-foreground/90 leading-relaxed [&_li]:text-foreground/90 [&_p]:text-foreground/90"
-                    dangerouslySetInnerHTML={{ __html: formatContent(content) }}
+                    className="prose prose-sm max-w-none text-foreground leading-relaxed [&_li]:text-foreground [&_p]:text-foreground [&_li]:mb-2"
+                    dangerouslySetInnerHTML={{ __html: formatContent(message.sections["Reasoning"]) }}
                   />
                 </div>
-              ))}
+              )}
+              
+              {/* Other Sections */}
+              {Object.entries(message.sections)
+                .filter(([title]) => title !== "Reasoning")
+                .map(([title, content]) => (
+                  <div 
+                    key={title}
+                    className="bg-muted/30 rounded-lg p-4 border border-border/50"
+                  >
+                    <h4 className="font-semibold text-sm mb-3 flex items-center gap-2 text-foreground">
+                      <span>{getSectionIcon(title)}</span>
+                      <span>{title}</span>
+                    </h4>
+                    <div 
+                      className="prose prose-sm max-w-none text-foreground/90 leading-relaxed [&_li]:text-foreground/90 [&_p]:text-foreground/90"
+                      dangerouslySetInnerHTML={{ __html: formatContent(content) }}
+                    />
+                  </div>
+                ))}
             </div>
           ) : (
             <div className="prose prose-sm max-w-none">
