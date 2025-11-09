@@ -46,48 +46,79 @@ export const getAgentByName = (agentName) => {
 export const runDebate = async (papers, onUpdate) => {
   try {
     const conversation = [];
+    const MAX_DEBATE_ROUNDS = 8; // Maximum total turns to prevent infinite loops
     
-    // Define the debate sequence
-    const debateSequence = [
-      { agent: 'Researcher', description: 'Initial analysis' },
-      { agent: 'Critic', description: 'Critical review' },
-      { agent: 'Researcher', description: 'Response to criticism' },
-      { agent: 'Critic', description: 'Follow-up critique' },
-      { agent: 'Synthesizer', description: 'Synthesizing insights' },
-      { agent: 'Validator', description: 'Validating conclusions' }
-    ];
-
-    // Run the debate
-    for (let i = 0; i < debateSequence.length; i++) {
-      const { agent, description } = debateSequence[i];
-
-      // Call the agent-respond edge function
+    // Helper to call an agent
+    const callAgent = async (agentType) => {
       const { data, error } = await supabase.functions.invoke('agent-respond', {
         body: {
-          agentType: agent,
+          agentType,
           papers: papers,
           conversationHistory: conversation
         }
       });
 
       if (error) {
-        console.error(`Error from ${agent}:`, error);
-        throw new Error(`${agent} failed: ${error.message}`);
+        console.error(`Error from ${agentType}:`, error);
+        throw new Error(`${agentType} failed: ${error.message}`);
       }
 
       if (!data) {
-        throw new Error(`No response from ${agent}`);
+        throw new Error(`No response from ${agentType}`);
       }
 
-      // Add to conversation
       conversation.push(data);
-
-      // Update the conversation in real-time
       onUpdate?.(conversation);
-
-      // Small delay for better UX
       await new Promise(resolve => setTimeout(resolve, 500));
+      
+      return data;
+    };
+
+    // Helper to check if Critic is satisfied
+    const isCriticSatisfied = (criticResponse) => {
+      const decision = criticResponse.sections?.["Decision"];
+      if (!decision) return false; // If no decision section, assume needs more rounds
+      
+      // Check for SATISFIED status in the decision
+      return decision.includes("SATISFIED") && !decision.includes("NEEDS_MORE_ROUNDS");
+    };
+
+    // Phase 1: Dynamic Researcher ↔ Critic debate
+    console.log('Starting dynamic debate phase...');
+    
+    // Initial Researcher analysis
+    await callAgent('Researcher');
+    
+    // Critic-driven iterative debate
+    let debateRounds = 0;
+    let criticSatisfied = false;
+    
+    while (!criticSatisfied && conversation.length < MAX_DEBATE_ROUNDS - 2) {
+      debateRounds++;
+      console.log(`Debate round ${debateRounds}`);
+      
+      // Critic responds
+      const criticResponse = await callAgent('Critic');
+      
+      // Check if Critic is satisfied
+      criticSatisfied = isCriticSatisfied(criticResponse);
+      
+      if (criticSatisfied) {
+        console.log('Critic satisfied, moving to synthesis phase');
+        break;
+      }
+      
+      // If not satisfied and we haven't hit max rounds, Researcher responds
+      if (conversation.length < MAX_DEBATE_ROUNDS - 2) {
+        console.log('Critic needs more rounds, Researcher responding...');
+        await callAgent('Researcher');
+      }
     }
+    
+    // Phase 2: Synthesis and Validation
+    console.log('Starting synthesis phase...');
+    await callAgent('Synthesizer');
+    await callAgent('Validator');
 
     // Extract final insights
     const synthesis = conversation.find(m => m.agent === 'Synthesizer');

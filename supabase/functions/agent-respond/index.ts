@@ -58,17 +58,31 @@ CRITICAL: You MUST format your response using EXACTLY this structure with ## hea
 - Question 1?
 - Question 2?
 
+## Decision
+- Status: SATISFIED or NEEDS_MORE_ROUNDS
+- Reason: Brief explanation (1 sentence)
+
+ASSESSMENT GUIDELINES:
+- Use SATISFIED if: concerns are adequately addressed, key questions answered, sufficient evidence provided
+- Use NEEDS_MORE_ROUNDS if: major gaps remain, critical questions unanswered, weak evidence for key claims
+- Limit to max 2-3 additional rounds total
+
 RULES:
 - Start EVERY section with ## followed by exact section name
 - Use bullet points only
 - Keep brief - max 2-3 bullets per section
 - DO NOT use **bold text** for headers
 - DO NOT write long paragraphs
+- ALWAYS include the ## Decision section
 
 EXAMPLE:
 ## Methodological Concerns
 - "Significant potential" overstates certainty from review-level evidence
-- Primary route claim lacks dose quantification across populations`,
+- Primary route claim lacks dose quantification across populations
+
+## Decision
+- Status: NEEDS_MORE_ROUNDS
+- Reason: Key dose-response relationships still lack quantitative evidence`,
 
   Synthesizer: `You are Dr. Synthesis, who finds connections.
 
